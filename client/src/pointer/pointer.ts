@@ -1,3 +1,4 @@
+// TODO: [0, 0] should be center of a screen
 type Position = {
     x: number,
     y: number,

@@ -1,4 +1,4 @@
-package pointer
+package ws
 
 import (
 	"net/http"
