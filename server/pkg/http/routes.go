@@ -1,7 +1,7 @@
 package http
 
 import (
-	"github.com/SergeyCherepiuk/docs/pkg/http/ws"
+	"github.com/SergeyCherepiuk/docs/pkg/http/broadcast"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -12,7 +12,8 @@ func (r Router) Build() *echo.Echo {
 	e := echo.New()
 	e.Use(middleware.Logger())
 
-	e.GET("/api/listen", ws.Broadcast)
+	e.GET("/api/pointer", broadcast.Pointer)
+	e.GET("/api/content", broadcast.Content)
 
 	return e
 }
