@@ -1,22 +1,24 @@
 package broadcast
 
 import (
-	"net/http"
+	"encoding/json"
+	"fmt"
 
-	"github.com/SergeyCherepiuk/docs/pkg/http/ws"
-	"github.com/labstack/echo/v4"
 	"golang.org/x/net/websocket"
 )
 
-var pointerRoom = ws.NewRoom()
+func handlePointerMessage(wsc *websocket.Conn, message []byte) error {
+	var u User
+	if err := json.Unmarshal(message, &u); err != nil {
+		return err
+	}
 
-func Pointer(c echo.Context) error {
-	websocket.Server{Handler: websocket.Handler(func(wsc *websocket.Conn) {
-		pointerRoom.EnterAndListen(wsc, ws.Listener{
-			OnEnter:   func() {},
-			OnMessage: func(message any) any { return message },
-			OnExit:    func() {},
-		})
-	})}.ServeHTTP(c.Response(), c.Request())
-	return c.NoContent(http.StatusSwitchingProtocols)
+	user, ok := connections[wsc]
+	if !ok {
+		return fmt.Errorf("connection wasn't found")
+	}
+
+	user.Pointer = u.Pointer
+	connections[wsc] = user
+	return nil
 }

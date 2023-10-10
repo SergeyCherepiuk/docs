@@ -1,106 +1,104 @@
 <script lang="ts">
+	import { writable, type Writable } from "svelte/store";
+	import { v1 as uuid } from "uuid";
 	import { onMount } from "svelte";
-	import { get, writable, type Writable } from "svelte/store";
-	import { Pointer, type Position } from "../pointer/pointer";
-	import { stringify, v1 as uuid } from "uuid";
-	import type { Selection } from "../selection/selection";
+	import type { User, Message, Position, Selection } from "../broadcast/types";
 
-    let content: Writable<{ data: string, toSend: boolean }> = writable({ data: "", toSend: false })
-
-    function updateContent(data: string, toSend: boolean) {
-        content.set({ data: data, toSend: toSend })
-    }
+    let content: Writable<{ data: string, toSend: boolean }> = writable({ data: "", toSend: false }) 
 
     let id = uuid()
 
-    let pointer = writable(new Pointer(id, { x: 0, y: 0 }, { x: 0, y: 0 }))
-    let pointers = writable(new Map<string, Pointer>([]))
-
-    function updatePointerPosition(pointer: Writable<Pointer>, position: Position) {
-        pointer.update(p => {
-            p.position = { x: position.x, y: position.y }
-            return p
-        })
-    }
-
-    function updatePointerScroll(pointer: Writable<Pointer>, scroll: Position) {
-        pointer.update(p => {
-            p.scroll = { x: scroll.x, y: scroll.y }
-            return p
-        })
-    }
-
-    let selection = writable({ id: id, start: 0, end: 0 })
-    let selections = writable(new Map<string, Selection>([]))
-
-    function updateSelection(s: { start: number, end: number }) {
-        selection.update(old => {
-            old.start = s.start,
-            old.end = s.end
-            return old
-        })
-    }
+    let user: Writable<User> = writable({
+        id: id,
+        pointer: {
+            position: { x: 0, y: 0 }, 
+            scroll: { x: 0, y: 0 }
+        },
+        selection: { start: 0, end: 0 },
+    })
+    let users = writable(new Map<string, User>([])) 
 
     onMount(() => {
         let area = document.getElementById("area") as HTMLTextAreaElement
 
-        let pointerSock = new WebSocket("ws://localhost:3000/api/pointer") 
-        pointerSock.onmessage = e => {
-            let pointer = JSON.parse(e.data) as Pointer
-            pointers.update(map => map.set(pointer.id, pointer))
+        let socket = new WebSocket("ws://localhost:3000/api/connect")
+        socket.onopen = () => send({ messageType: "user", rawMessage: $user })
+        socket.onmessage = e => {
+            // TODO: Sanitize corresponding of the data on disconnect message
 
-            let image = document.getElementById(`pointer-${pointer.id}`) as HTMLImageElement
-            if (image) {
-                image.style.left = pointer.position.x + pointer.scroll.x + "px"
-                image.style.top = pointer.position.y + pointer.scroll.y + "px"
+            let message = JSON.parse(e.data) as Message
+            if (message.messageType == "pointer") {
+                let user = message.rawMessage as User
+                users.update(map => map.set(user.id, user))
+
+                let image = document.getElementById(`pointer-${user.id}`) as HTMLImageElement
+                if (image) {
+                    image.style.left = user.pointer.position.x + user.pointer.scroll.x + "px"
+                    image.style.top = user.pointer.position.y + user.pointer.scroll.y + "px"
+                }
+            } else if (message.messageType == "selection") {
+                console.log(message.rawMessage) // NOTE: rawMessage of type User
+            } else if (message.messageType == "content") {
+                content.set({ data: message.rawMessage as string, toSend: false })
+            } else if (message.messageType == "user") {
+                let user = message.rawMessage as User
+                users.update(map => map.set(user.id, user))
             }
         }
 
-        area.onmousemove = e => updatePointerPosition(pointer, { x: e.clientX, y: e.clientY })
-        window.onscroll = () => updatePointerScroll(pointer, { x: window.scrollX, y: window.scrollY })
-
-        let contentSock = new WebSocket("ws://localhost:3000/api/content") 
-        contentSock.onmessage = e => updateContent(e.data, false) 
-
-        area.oninput = e => {
-            let value = (e.target as HTMLTextAreaElement).value;
-            updateContent(value, true)
-        }
-
-        let selectionSock = new WebSocket("ws://localhost:3000/api/selection") 
-        selectionSock.onmessage = e => {
-            let selection = JSON.parse(e.data) as Selection
-            console.log(selection)
-        }
+        area.onmousemove = e => updatePointerPosition({ x: e.clientX, y: e.clientY })
+        window.onscroll = () => updatePointerScroll({ x: window.scrollX, y: window.scrollY }) 
 
         area.onselect = e => {
             let target = (e.target as HTMLTextAreaElement)
             updateSelection({ start: target.selectionStart, end: target.selectionEnd })
         }
+        
+        area.oninput = e => {
+            let value = (e.target as HTMLTextAreaElement).value;
+            updateContent(value, true)
+        }
 
-        pointer.subscribe(p => send(pointerSock, p))
-        content.subscribe(c => {
-            if (c.toSend) send(contentSock, c.data)
-        })
-        selection.subscribe(s => send(selectionSock, s))
+        function updatePointerPosition(position: Position) {
+            user.update(u => {
+                u.pointer.position = position
+                send({ messageType: "pointer", rawMessage: u })
+                return u
+            })
+        }
+
+        function updatePointerScroll(scroll: Position) {
+            user.update(u => {
+                u.pointer.scroll = scroll
+                send({ messageType: "pointer", rawMessage: u })
+                return u
+            })
+        }
+        
+        function updateSelection(selection: Selection) {
+            user.update(u => {
+                u.selection = selection
+                send({ messageType: "selection", rawMessage: u })
+                return u
+            })
+        }
+
+        function updateContent(data: string, toSend: boolean) {
+            content.set({ data: data, toSend: toSend })
+            if (toSend) send({ messageType: "content", rawMessage: data}) 
+        }
+
+        function send(message: Message) {
+            if (socket.readyState == socket.OPEN) {
+                socket.send(JSON.stringify(message))
+            }
+        }
     })
-
-    function send(socket: WebSocket, value: any) {
-        if (socket.readyState != socket.OPEN) {
-            return
-        }
-
-        if (typeof value == "string") {
-            socket.send(value)
-        } else {
-            socket.send(JSON.stringify(value))
-        }
-    }
 </script>
 
-<div class="flex w-full h-full justify-center bg-gray-300">
-    {#each $pointers.values() as pointer}
-        <img id={`pointer-${pointer.id}`} src="/pointer.svg" alt="Pointer" class="absolute pointer-events-none" />
+<!-- <div class="flex w-full min-w-fit h-full justify-center bg-gray-300"> -->
+    {#each $users.keys() as id}
+        <img id={`pointer-${id}`} src="/pointer.svg" alt="Pointer" class="absolute pointer-events-none" />
     {/each}
     <textarea id="area" class="w-[768px] h-[2000px] resize-none p-8" value={$content.data} />
-</div>
+<!-- </div> -->
