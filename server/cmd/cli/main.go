@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
 	"github.com/SergeyCherepiuk/docs/pkg/http"
 	"github.com/joho/godotenv"
 )
@@ -13,6 +14,7 @@ func init() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatal(err)
 	}
+	neo4j.MustInitialize()
 }
 
 func main() {
