@@ -8,7 +8,12 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-var ndb neo4j.DriverWithContext
+var (
+	driver neo4j.DriverWithContext
+
+	EquivalentSchemaRuleAlreadyExists = "Neo.ClientError.Schema.EquivalentSchemaRuleAlreadyExists"
+	ConstraintValidationFailed        = "Neo.ClientError.Schema.ConstraintValidationFailed"
+)
 
 func MustInitialize() {
 	var (
@@ -20,12 +25,26 @@ func MustInitialize() {
 		realm    = os.Getenv("NEO4J_REALM")
 	)
 
-	ndb, err = neo4j.NewDriverWithContext(dsn, neo4j.BasicAuth(username, password, realm))
+	driver, err = neo4j.NewDriverWithContext(dsn, neo4j.BasicAuth(username, password, realm))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := ndb.VerifyConnectivity(context.Background()); err != nil {
+	if err := driver.VerifyConnectivity(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+
+	defineConstraints()
+}
+
+func defineConstraints() {
+	cypher := `CREATE CONSTRAINT constraint_user_name_unique FOR (user:User) REQUIRE user.username IS UNIQUE`
+
+	ctx := context.Background()
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	_, err := session.Run(ctx, cypher, nil)
+
+	if err != nil && err.(*neo4j.Neo4jError).Code != EquivalentSchemaRuleAlreadyExists {
 		log.Fatal(err)
 	}
 }
