@@ -14,12 +14,21 @@ func (r Router) Build() *echo.Echo {
 	e.Use(middleware.Logger())
 
 	userCreator := neo4j.NewUserCreator()
-	userHandler := handlers.NewUserHandler(userCreator)
+	userGetter := neo4j.NewUserGetter()
+	userUpdater := neo4j.NewUserUpdater()
+	userDeleter := neo4j.NewUserDeleter()
+
+	userHandler := handlers.NewUserHandler(
+		userCreator, userGetter, userUpdater, userDeleter,
+	)
 
 	v1 := e.Group("/api/v1")
 
 	user := v1.Group("/user")
+	user.GET("/:username", userHandler.GetByUsername)
 	user.POST("", userHandler.Create)
+	user.PUT("/:username", userHandler.Update)
+	user.DELETE("/:username", userHandler.Delete)
 
 	return e
 }

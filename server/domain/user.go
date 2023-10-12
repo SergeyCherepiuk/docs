@@ -12,7 +12,7 @@ type UserCreator interface {
 }
 
 type UserGetter interface {
-	Get(ctx context.Context, username string) (User, error)
+	GetByUsername(ctx context.Context, username string) (User, error)
 }
 
 type UserUpdater interface {
