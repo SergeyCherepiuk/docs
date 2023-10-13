@@ -3,8 +3,8 @@ package domain
 import "context"
 
 type User struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `json:"username" prop:"username"`
+	Password string `json:"password" prop:"password"`
 }
 
 type UserCreator interface {

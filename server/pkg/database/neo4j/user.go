@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/SergeyCherepiuk/docs/domain"
+	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j/internal"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
@@ -42,7 +43,7 @@ type userGetter struct {
 
 func NewUserGetter() *userGetter {
 	return &userGetter{
-		getUserByUsernameCypher: `MATCH (u:User {username: $username}) RETURN u.password as password`,
+		getUserByUsernameCypher: `MATCH (u:User {username: $username}) RETURN u.username as username, u.password as password`,
 	}
 }
 
@@ -59,20 +60,9 @@ func (g userGetter) GetByUsername(ctx context.Context, username string) (domain.
 		return domain.User{}, fmt.Errorf("failed to get the user from the database")
 	}
 
-	record, err := result.Single(ctx)
-	if record == nil || err != nil {
-		return domain.User{}, fmt.Errorf("user wasn't found")
-	}
-
-	password, passwordFound := record.Get("password")
-	if !passwordFound {
-		return domain.User{}, fmt.Errorf("failed to get the user from the database")
-	}
-
-	return domain.User{
-		Username: username,
-		Password: password.(string),
-	}, nil
+	var user domain.User
+	err = internal.GetSingle[domain.User](ctx, result, &user)
+	return user, err
 }
 
 type userUpdater struct {
