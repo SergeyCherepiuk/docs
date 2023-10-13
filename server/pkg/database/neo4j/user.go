@@ -30,14 +30,6 @@ type userDeleter struct {
 	deleteCypher string
 }
 
-type existsResult struct {
-	Exists bool `prop:"exists"`
-}
-
-type countResult struct {
-	Count int64 `prop:"count"`
-}
-
 func NewUserCreator() *userCreator {
 	return &userCreator{
 		createCypher: `CREATE (u:User {username: $username, password: $password})`,
@@ -116,12 +108,7 @@ func (c userChecker) Exists(ctx context.Context, username string) (bool, error) 
 		return false, fmt.Errorf("failed to find out if user exists")
 	}
 
-	exists, err := internal.GetSingle[existsResult](ctx, result)
-	if err != nil {
-		return false, err
-	}
-
-	return exists.Exists, nil
+	return internal.GetSingle[bool](ctx, result)
 }
 
 func (u userUpdater) UpdateUsername(ctx context.Context, username, newUsername string) error {
@@ -140,8 +127,8 @@ func (u userUpdater) UpdateUsername(ctx context.Context, username, newUsername s
 		return fmt.Errorf("failed to update username")
 	}
 
-	count, err := internal.GetSingle[countResult](ctx, result)
-	if count.Count <= 0 || err != nil {
+	count, err := internal.GetSingle[int64](ctx, result)
+	if count <= 0 || err != nil {
 		return fmt.Errorf("user wasn't found")
 	}
 
@@ -162,8 +149,8 @@ func (u userUpdater) UpdatePassword(ctx context.Context, username, newPassword s
 		return fmt.Errorf("failed to update password")
 	}
 
-	count, err := internal.GetSingle[countResult](ctx, result)
-	if count.Count <= 0 || err != nil {
+	count, err := internal.GetSingle[int64](ctx, result)
+	if count <= 0 || err != nil {
 		return fmt.Errorf("user wasn't found")
 	}
 
