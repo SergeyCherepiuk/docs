@@ -38,12 +38,12 @@ func (c userCreator) Create(ctx context.Context, user domain.User) error {
 }
 
 type userGetter struct {
-	getUserByUsernameCypher string
+	getByUsernameCypher string
 }
 
 func NewUserGetter() *userGetter {
 	return &userGetter{
-		getUserByUsernameCypher: `MATCH (u:User {username: $username}) RETURN u.username as username, u.password as password`,
+		getByUsernameCypher: `MATCH (u:User {username: $username}) RETURN u.username as username, u.password as password`,
 	}
 }
 
@@ -55,14 +55,12 @@ func (g userGetter) GetByUsername(ctx context.Context, username string) (domain.
 		"username": username,
 	}
 
-	result, err := session.Run(ctx, g.getUserByUsernameCypher, params)
+	result, err := session.Run(ctx, g.getByUsernameCypher, params)
 	if err != nil {
 		return domain.User{}, fmt.Errorf("failed to get the user from the database")
 	}
 
-	var user domain.User
-	err = internal.GetSingle[domain.User](ctx, result, &user)
-	return user, err
+	return internal.GetSingle[domain.User](ctx, result)
 }
 
 type userUpdater struct {
