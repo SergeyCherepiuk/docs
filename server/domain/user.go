@@ -15,6 +15,10 @@ type UserGetter interface {
 	GetByUsername(ctx context.Context, username string) (User, error)
 }
 
+type UserChecker interface {
+	Exists(ctx context.Context, username string) (bool, error)
+}
+
 type UserUpdater interface {
 	UpdateUsername(ctx context.Context, username, newUsername string) error
 	UpdatePassword(ctx context.Context, username, newPassword string) error

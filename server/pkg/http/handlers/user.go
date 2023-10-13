@@ -13,6 +13,7 @@ import (
 type userHandler struct {
 	userCreator domain.UserCreator
 	userGetter  domain.UserGetter
+	userChecker domain.UserChecker
 	userUpdater domain.UserUpdater
 	userDeleter domain.UserDeleter
 }
@@ -20,12 +21,14 @@ type userHandler struct {
 func NewUserHandler(
 	userCreator domain.UserCreator,
 	userGetter domain.UserGetter,
+	userChecker domain.UserChecker,
 	userUpdater domain.UserUpdater,
 	userDeleter domain.UserDeleter,
 ) *userHandler {
 	return &userHandler{
 		userCreator: userCreator,
 		userGetter:  userGetter,
+		userChecker: userChecker,
 		userUpdater: userUpdater,
 		userDeleter: userDeleter,
 	}
@@ -79,6 +82,12 @@ func (u updates) hasPassword() bool {
 func (h userHandler) Update(c echo.Context) error {
 	username := c.Param("username")
 
+	if exists, err := h.userChecker.Exists(context.Background(), username); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
+	} else if !exists {
+		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
+	}
+
 	var updates updates
 	if c.Bind(&updates) != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
@@ -92,7 +101,19 @@ func (h userHandler) Update(c echo.Context) error {
 	}
 
 	if updates.hasPassword() {
-		// TODO: Check if old password is correct
+		user, err := h.userGetter.GetByUsername(context.Background(), username)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
+		}
+
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(updates.OldPassword)); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "Wrong password")
+		}
+
+		if updates.NewPassword != updates.NewPasswordRepeat {
+			return echo.NewHTTPError(http.StatusBadRequest, "New passwords aren't the same")
+		}
+
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(updates.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to hash the password")
@@ -108,6 +129,12 @@ func (h userHandler) Update(c echo.Context) error {
 
 func (h userHandler) Delete(c echo.Context) error {
 	username := c.Param("username")
+
+	if exists, err := h.userChecker.Exists(context.Background(), username); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
+	} else if !exists {
+		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
+	}
 
 	if err := h.userDeleter.Delete(context.Background(), username); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))

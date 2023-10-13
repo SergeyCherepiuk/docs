@@ -8,6 +8,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+// TODO: Extend the set of functions to scan not only structs
+
 func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext) (T, error) {
 	record, err := result.Single(ctx)
 	if record == nil || err != nil {

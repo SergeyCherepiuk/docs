@@ -17,6 +17,10 @@ type userGetter struct {
 	getByUsernameCypher string
 }
 
+type userChecker struct {
+	existsCypher string
+}
+
 type userUpdater struct {
 	updateUsernameCypher string
 	updatePasswordCypher string
@@ -24,6 +28,10 @@ type userUpdater struct {
 
 type userDeleter struct {
 	deleteCypher string
+}
+
+type existsResult struct {
+	Exists bool `prop:"exists"`
 }
 
 type countResult struct {
@@ -39,6 +47,12 @@ func NewUserCreator() *userCreator {
 func NewUserGetter() *userGetter {
 	return &userGetter{
 		getByUsernameCypher: `MATCH (u:User {username: $username}) RETURN u.username as username, u.password as password`,
+	}
+}
+
+func NewUserChecker() *userChecker {
+	return &userChecker{
+		existsCypher: `MATCH (u:User {username: $username}) RETURN COUNT(u) > 0 AS exists`,
 	}
 }
 
@@ -89,6 +103,27 @@ func (g userGetter) GetByUsername(ctx context.Context, username string) (domain.
 	return internal.GetSingle[domain.User](ctx, result)
 }
 
+func (c userChecker) Exists(ctx context.Context, username string) (bool, error) {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"username": username,
+	}
+
+	result, err := session.Run(ctx, c.existsCypher, params)
+	if err != nil {
+		return false, fmt.Errorf("failed to find out if user exists")
+	}
+
+	exists, err := internal.GetSingle[existsResult](ctx, result)
+	if err != nil {
+		return false, err
+	}
+
+	return exists.Exists, nil
+}
+
 func (u userUpdater) UpdateUsername(ctx context.Context, username, newUsername string) error {
 	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sessions.Close(ctx)
@@ -105,9 +140,8 @@ func (u userUpdater) UpdateUsername(ctx context.Context, username, newUsername s
 		return fmt.Errorf("failed to update username")
 	}
 
-	// TODO: Extract this logic into a separate method "Exists"
-	countResult, err := internal.GetSingle[countResult](ctx, result)
-	if countResult.Count <= 0 || err != nil {
+	count, err := internal.GetSingle[countResult](ctx, result)
+	if count.Count <= 0 || err != nil {
 		return fmt.Errorf("user wasn't found")
 	}
 
@@ -123,21 +157,19 @@ func (u userUpdater) UpdatePassword(ctx context.Context, username, newPassword s
 		"new_password": newPassword,
 	}
 
-	result, err := sessions.Run(ctx, u.updateUsernameCypher, params)
+	result, err := sessions.Run(ctx, u.updatePasswordCypher, params)
 	if err != nil {
 		return fmt.Errorf("failed to update password")
 	}
 
-	// TODO: Extract this logic into a separate method "Exists"
-	countResult, err := internal.GetSingle[countResult](ctx, result)
-	if countResult.Count <= 0 || err != nil {
+	count, err := internal.GetSingle[countResult](ctx, result)
+	if count.Count <= 0 || err != nil {
 		return fmt.Errorf("user wasn't found")
 	}
 
 	return nil
 }
 
-// TODO: Check is user exists before calling this method
 func (d userDeleter) Delete(ctx context.Context, username string) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
