@@ -13,7 +13,6 @@ import (
 type userHandler struct {
 	userCreator domain.UserCreator
 	userGetter  domain.UserGetter
-	userChecker domain.UserChecker
 	userUpdater domain.UserUpdater
 	userDeleter domain.UserDeleter
 }
@@ -21,14 +20,12 @@ type userHandler struct {
 func NewUserHandler(
 	userCreator domain.UserCreator,
 	userGetter domain.UserGetter,
-	userChecker domain.UserChecker,
 	userUpdater domain.UserUpdater,
 	userDeleter domain.UserDeleter,
 ) *userHandler {
 	return &userHandler{
 		userCreator: userCreator,
 		userGetter:  userGetter,
-		userChecker: userChecker,
 		userUpdater: userUpdater,
 		userDeleter: userDeleter,
 	}
@@ -82,9 +79,8 @@ func (u updates) hasPassword() bool {
 func (h userHandler) Update(c echo.Context) error {
 	username := c.Param("username")
 
-	if exists, err := h.userChecker.Exists(context.Background(), username); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
-	} else if !exists {
+	user, err := h.userGetter.GetByUsername(context.Background(), username)
+	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
 	}
 
@@ -94,7 +90,7 @@ func (h userHandler) Update(c echo.Context) error {
 	}
 
 	if updates.hasUsername() {
-		if err := h.userUpdater.UpdateUsername(context.Background(), username, updates.NewUsername); err != nil {
+		if err := h.userUpdater.UpdateUsername(context.Background(), user, updates.NewUsername); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
 		return c.NoContent(http.StatusOK)
@@ -118,7 +114,7 @@ func (h userHandler) Update(c echo.Context) error {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to hash the password")
 		}
-		if err := h.userUpdater.UpdatePassword(context.Background(), username, string(hashedPassword)); err != nil {
+		if err := h.userUpdater.UpdatePassword(context.Background(), user, string(hashedPassword)); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
 		return c.NoContent(http.StatusOK)
@@ -130,13 +126,12 @@ func (h userHandler) Update(c echo.Context) error {
 func (h userHandler) Delete(c echo.Context) error {
 	username := c.Param("username")
 
-	if exists, err := h.userChecker.Exists(context.Background(), username); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
-	} else if !exists {
+	user, err := h.userGetter.GetByUsername(context.Background(), username)
+	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
 	}
 
-	if err := h.userDeleter.Delete(context.Background(), username); err != nil {
+	if err := h.userDeleter.Delete(context.Background(), user); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 

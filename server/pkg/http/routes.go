@@ -15,12 +15,11 @@ func (r Router) Build() *echo.Echo {
 
 	userCreator := neo4j.NewUserCreator()
 	userGetter := neo4j.NewUserGetter()
-	userChecker := neo4j.NewUserChecker()
 	userUpdater := neo4j.NewUserUpdater()
 	userDeleter := neo4j.NewUserDeleter()
 
 	userHandler := handlers.NewUserHandler(
-		userCreator, userGetter, userChecker, userUpdater, userDeleter,
+		userCreator, userGetter, userUpdater, userDeleter,
 	)
 
 	v1 := e.Group("/api/v1")

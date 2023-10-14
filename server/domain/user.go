@@ -15,15 +15,11 @@ type UserGetter interface {
 	GetByUsername(ctx context.Context, username string) (User, error)
 }
 
-type UserChecker interface {
-	Exists(ctx context.Context, username string) (bool, error)
-}
-
 type UserUpdater interface {
-	UpdateUsername(ctx context.Context, username, newUsername string) error
-	UpdatePassword(ctx context.Context, username, newPassword string) error
+	UpdateUsername(ctx context.Context, user User, newUsername string) error
+	UpdatePassword(ctx context.Context, user User, newPassword string) error
 }
 
 type UserDeleter interface {
-	Delete(ctx context.Context, username string) error
+	Delete(ctx context.Context, user User) error
 }

@@ -17,10 +17,6 @@ type userGetter struct {
 	getByUsernameCypher string
 }
 
-type userChecker struct {
-	existsCypher string
-}
-
 type userUpdater struct {
 	updateUsernameCypher string
 	updatePasswordCypher string
@@ -39,12 +35,6 @@ func NewUserCreator() *userCreator {
 func NewUserGetter() *userGetter {
 	return &userGetter{
 		getByUsernameCypher: `MATCH (u:User {username: $username}) RETURN u.username as username, u.password as password`,
-	}
-}
-
-func NewUserChecker() *userChecker {
-	return &userChecker{
-		existsCypher: `MATCH (u:User {username: $username}) RETURN COUNT(u) > 0 AS exists`,
 	}
 }
 
@@ -95,28 +85,12 @@ func (g userGetter) GetByUsername(ctx context.Context, username string) (domain.
 	return internal.GetSingle[domain.User](ctx, result)
 }
 
-func (c userChecker) Exists(ctx context.Context, username string) (bool, error) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-
-	params := map[string]any{
-		"username": username,
-	}
-
-	result, err := session.Run(ctx, c.existsCypher, params)
-	if err != nil {
-		return false, fmt.Errorf("failed to find out if user exists")
-	}
-
-	return internal.GetSingle[bool](ctx, result)
-}
-
-func (u userUpdater) UpdateUsername(ctx context.Context, username, newUsername string) error {
+func (u userUpdater) UpdateUsername(ctx context.Context, user domain.User, newUsername string) error {
 	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sessions.Close(ctx)
 
 	params := map[string]any{
-		"username":     username,
+		"username":     user.Username,
 		"new_username": newUsername,
 	}
 
@@ -135,12 +109,12 @@ func (u userUpdater) UpdateUsername(ctx context.Context, username, newUsername s
 	return nil
 }
 
-func (u userUpdater) UpdatePassword(ctx context.Context, username, newPassword string) error {
+func (u userUpdater) UpdatePassword(ctx context.Context, user domain.User, newPassword string) error {
 	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sessions.Close(ctx)
 
 	params := map[string]any{
-		"username":     username,
+		"username":     user.Username,
 		"new_password": newPassword,
 	}
 
@@ -157,12 +131,12 @@ func (u userUpdater) UpdatePassword(ctx context.Context, username, newPassword s
 	return nil
 }
 
-func (d userDeleter) Delete(ctx context.Context, username string) error {
+func (d userDeleter) Delete(ctx context.Context, user domain.User) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
 
 	params := map[string]any{
-		"username": username,
+		"username": user.Username,
 	}
 
 	_, err := session.Run(ctx, d.deleteCypher, params)
