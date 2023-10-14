@@ -37,6 +37,8 @@ func (h userHandler) Create(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
 	}
 
+	// TODO: Validation
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to hash the password")

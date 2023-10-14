@@ -51,7 +51,7 @@ func NewUserDeleter() *userDeleter {
 	}
 }
 
-func (c userCreator) Create(ctx context.Context, user domain.User) error {
+func (uc userCreator) Create(ctx context.Context, user domain.User) error {
 	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sessions.Close(ctx)
 
@@ -60,16 +60,18 @@ func (c userCreator) Create(ctx context.Context, user domain.User) error {
 		"password": user.Password,
 	}
 
-	_, err := sessions.Run(ctx, c.createCypher, params)
-	if err != nil && err.(*neo4j.Neo4jError).Code == ConstraintValidationFailed {
-		return fmt.Errorf("username already taken")
-	} else if err != nil {
-		return fmt.Errorf("failed to store user in the database")
+	_, err := sessions.Run(ctx, uc.createCypher, params)
+	if err != nil {
+		if neo4jErr, ok := err.(*neo4j.Neo4jError); ok && neo4jErr.Code == ConstraintValidationFailed {
+			return fmt.Errorf("username already taken")
+		} else {
+			return fmt.Errorf("failed to store user in the database")
+		}
 	}
 	return nil
 }
 
-func (g userGetter) GetByUsername(ctx context.Context, username string) (domain.User, error) {
+func (ug userGetter) GetByUsername(ctx context.Context, username string) (domain.User, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
 
@@ -77,7 +79,7 @@ func (g userGetter) GetByUsername(ctx context.Context, username string) (domain.
 		"username": username,
 	}
 
-	result, err := session.Run(ctx, g.getByUsernameCypher, params)
+	result, err := session.Run(ctx, ug.getByUsernameCypher, params)
 	if err != nil {
 		return domain.User{}, fmt.Errorf("failed to get the user from the database")
 	}
@@ -85,7 +87,7 @@ func (g userGetter) GetByUsername(ctx context.Context, username string) (domain.
 	return internal.GetSingle[domain.User](ctx, result)
 }
 
-func (u userUpdater) UpdateUsername(ctx context.Context, user domain.User, newUsername string) error {
+func (uu userUpdater) UpdateUsername(ctx context.Context, user domain.User, newUsername string) error {
 	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sessions.Close(ctx)
 
@@ -94,22 +96,23 @@ func (u userUpdater) UpdateUsername(ctx context.Context, user domain.User, newUs
 		"new_username": newUsername,
 	}
 
-	result, err := sessions.Run(ctx, u.updateUsernameCypher, params)
-	if err != nil && err.(*neo4j.Neo4jError).Code == ConstraintValidationFailed {
-		return fmt.Errorf("username already taken")
-	} else if err != nil {
-		return fmt.Errorf("failed to update username")
+	result, err := sessions.Run(ctx, uu.updateUsernameCypher, params)
+	if err != nil {
+		if neo4jErr, ok := err.(*neo4j.Neo4jError); ok && neo4jErr.Code == ConstraintValidationFailed {
+			return fmt.Errorf("username already taken")
+		} else {
+			return fmt.Errorf("failed to update username")
+		}
 	}
 
-	count, err := internal.GetSingle[int64](ctx, result)
-	if count <= 0 || err != nil {
+	if count, err := internal.GetSingle[int64](ctx, result); count <= 0 || err != nil {
 		return fmt.Errorf("user wasn't found")
 	}
 
 	return nil
 }
 
-func (u userUpdater) UpdatePassword(ctx context.Context, user domain.User, newPassword string) error {
+func (uu userUpdater) UpdatePassword(ctx context.Context, user domain.User, newPassword string) error {
 	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sessions.Close(ctx)
 
@@ -118,20 +121,19 @@ func (u userUpdater) UpdatePassword(ctx context.Context, user domain.User, newPa
 		"new_password": newPassword,
 	}
 
-	result, err := sessions.Run(ctx, u.updatePasswordCypher, params)
+	result, err := sessions.Run(ctx, uu.updatePasswordCypher, params)
 	if err != nil {
 		return fmt.Errorf("failed to update password")
 	}
 
-	count, err := internal.GetSingle[int64](ctx, result)
-	if count <= 0 || err != nil {
+	if count, err := internal.GetSingle[int64](ctx, result); count <= 0 || err != nil {
 		return fmt.Errorf("user wasn't found")
 	}
 
 	return nil
 }
 
-func (d userDeleter) Delete(ctx context.Context, user domain.User) error {
+func (ud userDeleter) Delete(ctx context.Context, user domain.User) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
 
@@ -139,8 +141,7 @@ func (d userDeleter) Delete(ctx context.Context, user domain.User) error {
 		"username": user.Username,
 	}
 
-	_, err := session.Run(ctx, d.deleteCypher, params)
-	if err != nil {
+	if _, err := session.Run(ctx, ud.deleteCypher, params); err != nil {
 		return fmt.Errorf("failed to delete the user")
 	}
 	return nil
