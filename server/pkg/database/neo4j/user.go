@@ -101,7 +101,7 @@ func (uu userUpdater) UpdateUsername(ctx context.Context, user domain.User, newU
 		if neo4jErr, ok := err.(*neo4j.Neo4jError); ok && neo4jErr.Code == ConstraintValidationFailed {
 			return fmt.Errorf("username already taken")
 		} else {
-			return fmt.Errorf("failed to update username")
+			return fmt.Errorf("failed to update user's username")
 		}
 	}
 
@@ -123,7 +123,7 @@ func (uu userUpdater) UpdatePassword(ctx context.Context, user domain.User, newP
 
 	result, err := sessions.Run(ctx, uu.updatePasswordCypher, params)
 	if err != nil {
-		return fmt.Errorf("failed to update password")
+		return fmt.Errorf("failed to update user's password")
 	}
 
 	if count, err := internal.GetSingle[int64](ctx, result); count <= 0 || err != nil {

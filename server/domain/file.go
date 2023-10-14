@@ -18,9 +18,9 @@ type FileGetter interface {
 }
 
 type FileUpdater interface {
-	UpdateName(ctx context.Context, id string, name string) error
+	UpdateName(ctx context.Context, file File, name string) error
 }
 
 type FileDeleter interface {
-	Delete(ctx context.Context, id string) error
+	Delete(ctx context.Context, file File) error
 }

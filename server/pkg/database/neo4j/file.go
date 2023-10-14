@@ -17,6 +17,10 @@ type fileGetter struct {
 	getByIdCypher string
 }
 
+type fileUpdater struct {
+	updateNameCypher string
+}
+
 func NewFileCreator() *fileCreator {
 	return &fileCreator{
 		createCypher: `CREATE (f:File {id: $id, name: $name})`,
@@ -26,6 +30,12 @@ func NewFileCreator() *fileCreator {
 func NewFileGetter() *fileGetter {
 	return &fileGetter{
 		getByIdCypher: `MATCH (f:File {id: $id}) RETURN f.id as id, f.name as name`,
+	}
+}
+
+func NewFileUpdater() *fileUpdater {
+	return &fileUpdater{
+		updateNameCypher: `MATCH (f:File {id: $id}) SET f.name = $new_name RETURN COUNT(f) as count`,
 	}
 }
 
@@ -65,4 +75,25 @@ func (fg fileGetter) GetById(ctx context.Context, id string) (domain.File, error
 	}
 
 	return internal.GetSingle[domain.File](ctx, result)
+}
+
+func (fu fileUpdater) UpdateName(ctx context.Context, file domain.File, name string) error {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"id":       file.Id,
+		"new_name": name,
+	}
+
+	result, err := session.Run(ctx, fu.updateNameCypher, params)
+	if err != nil {
+		return fmt.Errorf("failed to update file's name")
+	}
+
+	if count, err := internal.GetSingle[int64](ctx, result); count <= 0 || err != nil {
+		return fmt.Errorf("file wasn't found")
+	}
+
+	return nil
 }

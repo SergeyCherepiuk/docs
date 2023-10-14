@@ -63,18 +63,18 @@ func (h userHandler) GetByUsername(c echo.Context) error {
 	return c.JSON(http.StatusOK, user)
 }
 
-type updates struct {
+type userUpdates struct {
 	NewUsername       string `json:"newUsername"`
 	OldPassword       string `json:"oldPassword"`
 	NewPassword       string `json:"newPassword"`
 	NewPasswordRepeat string `json:"newPasswordRepeat"`
 }
 
-func (u updates) hasUsername() bool {
+func (u userUpdates) hasUsername() bool {
 	return u.NewUsername != ""
 }
 
-func (u updates) hasPassword() bool {
+func (u userUpdates) hasPassword() bool {
 	return u.OldPassword != "" && u.NewPassword != "" && u.NewPasswordRepeat != ""
 }
 
@@ -86,12 +86,14 @@ func (h userHandler) Update(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
 	}
 
-	var updates updates
+	var updates userUpdates
 	if c.Bind(&updates) != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
 	}
 
 	if updates.hasUsername() {
+		// TODO: Validation
+
 		if err := h.userUpdater.UpdateUsername(context.Background(), user, updates.NewUsername); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
@@ -99,6 +101,8 @@ func (h userHandler) Update(c echo.Context) error {
 	}
 
 	if updates.hasPassword() {
+		// TODO: Validation
+
 		user, err := h.userGetter.GetByUsername(context.Background(), username)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))

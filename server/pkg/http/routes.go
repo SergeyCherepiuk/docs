@@ -23,6 +23,7 @@ func (r Router) Build() *echo.Echo {
 	var (
 		fileCreator = neo4j.NewFileCreator()
 		fileGetter  = neo4j.NewFileGetter()
+		fileUpdater = neo4j.NewFileUpdater()
 	)
 
 	var (
@@ -30,7 +31,7 @@ func (r Router) Build() *echo.Echo {
 			userCreator, userGetter, userUpdater, userDeleter,
 		)
 		fileHandler = handlers.NewFileHandler(
-			fileCreator, fileGetter,
+			fileCreator, fileGetter, fileUpdater,
 		)
 	)
 
@@ -45,6 +46,7 @@ func (r Router) Build() *echo.Echo {
 	file := v1.Group("/file")
 	file.POST("", fileHandler.Create)
 	file.GET("/:id", fileHandler.Get)
+	file.PUT("/:id", fileHandler.Update)
 
 	return e
 }
