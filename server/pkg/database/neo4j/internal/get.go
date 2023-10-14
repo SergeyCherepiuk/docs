@@ -8,17 +8,23 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-// TODO: Extend the set of functions to scan not only structs
+var (
+	ErrNoRecords        = fmt.Errorf("no records found")
+	ErrNilRecord        = fmt.Errorf("record is nil")
+	ErrInvalidValue     = fmt.Errorf("value is invalid")
+	ErrCannotSetValue   = fmt.Errorf("value cannot be set")
+	ErrPropertyNotFound = fmt.Errorf("property not found")
+	ErrTypeMismatch     = fmt.Errorf("value and node's property have different types")
+)
 
 func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext) (T, error) {
 	var value T
 
 	record, err := result.Single(ctx)
 	if record == nil || err != nil {
-		return value, fmt.Errorf("failed to get the record from result")
+		return value, ErrNoRecords
 	}
 
-	// TODO: Check if this doubtable quality code works
 	if reflect.ValueOf(value).Kind() == reflect.Struct {
 		return collectStruct[T](ctx, record)
 	}
@@ -28,17 +34,22 @@ func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext) (T, e
 func GetMultiple[T any](ctx context.Context, result neo4j.ResultWithContext) ([]T, error) {
 	records, err := result.Collect(ctx)
 	if records == nil || len(records) <= 0 || err != nil {
-		return nil, fmt.Errorf("failed to get the records from result")
+		return nil, ErrNoRecords
 	}
 
-	values := make([]T, 0, len(records))
-	for i := 0; i < len(records); i++ {
-		value, err := collectStruct[T](ctx, records[i])
+	values := make([]T, len(records))
+	for i, record := range records {
+		var value T
+		var err error
+		if reflect.ValueOf(value).Kind() == reflect.Struct {
+			value, err = collectStruct[T](ctx, record)
+		} else {
+			value, err = collect[T](ctx, record)
+		}
 		if err != nil {
 			return nil, err
 		}
-
-		values = append(values, value)
+		values[i] = value
 	}
 
 	return values, nil
@@ -48,16 +59,23 @@ func collect[T any](ctx context.Context, record *neo4j.Record) (T, error) {
 	var value T
 
 	if record == nil {
-		return value, fmt.Errorf("record is nil")
+		return value, ErrNilRecord
 	}
 
-	valueValue := reflect.ValueOf(&value).Elem()
-	if !valueValue.IsValid() || !valueValue.CanSet() {
-		return value, fmt.Errorf("value is invalid or cannot be set")
+	rv := reflect.ValueOf(&value).Elem()
+	if !rv.IsValid() {
+		return value, ErrInvalidValue
+	} else if !rv.CanSet() {
+		return value, ErrCannotSetValue
 	}
 
-	// TODO: Would it panic on wrong types?
-	valueValue.Set(reflect.ValueOf(record.Values[0]))
+	pv := reflect.ValueOf(record.Values[0])
+	if rv.Kind() != pv.Kind() {
+		return value, ErrTypeMismatch
+	}
+
+	rv.Set(pv)
+
 	return value, nil
 }
 
@@ -65,29 +83,35 @@ func collectStruct[T any](ctx context.Context, record *neo4j.Record) (T, error) 
 	var value T
 
 	if record == nil {
-		return value, fmt.Errorf("record is nil")
+		return value, ErrNilRecord
 	}
 
-	valueType := reflect.TypeOf(&value).Elem()
-	valueValue := reflect.ValueOf(&value).Elem()
-
-	for i := 0; i < valueType.NumField(); i++ {
-		tag := valueType.Field(i).Tag.Get("prop")
+	rt := reflect.TypeOf(&value).Elem()
+	rv := reflect.ValueOf(&value).Elem()
+	for i := 0; i < rt.NumField(); i++ {
+		tag := rt.Field(i).Tag.Get("prop")
 		if tag == "" {
 			continue
 		}
 
-		fieldValue := valueValue.Field(i)
-		if !fieldValue.IsValid() || !fieldValue.CanSet() {
-			return value, fmt.Errorf("the '%s' field is invalid or cannot be set", tag)
+		fv := rv.Field(i)
+		if !fv.IsValid() {
+			return value, ErrInvalidValue
+		} else if !fv.CanSet() {
+			return value, ErrCannotSetValue
 		}
 
-		recordProp, found := record.Get(tag)
+		property, found := record.Get(tag)
 		if !found {
-			return value, fmt.Errorf("the '%s' field is not found in node", tag)
+			return value, ErrPropertyNotFound
 		}
 
-		fieldValue.Set(reflect.ValueOf(recordProp))
+		pv := reflect.ValueOf(property)
+		if fv.Kind() != pv.Kind() {
+			return value, ErrTypeMismatch
+		}
+
+		fv.Set(pv)
 	}
 
 	return value, nil
