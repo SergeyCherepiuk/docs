@@ -38,13 +38,17 @@ func MustInitialize() {
 }
 
 func defineConstraints() {
-	cypher := `CREATE CONSTRAINT constraint_user_name_unique FOR (user:User) REQUIRE user.username IS UNIQUE`
+	constraints := []string{
+		`CREATE CONSTRAINT constraint_user_name_unique FOR (u:User) REQUIRE u.username IS UNIQUE`,
+		`CREATE CONSTRAINT constraint_file_id_unique FOR (f:File) REQUIRE f.id IS UNIQUE`,
+	}
 
 	ctx := context.Background()
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	_, err := session.Run(ctx, cypher, nil)
-
-	if err != nil && err.(*neo4j.Neo4jError).Code != EquivalentSchemaRuleAlreadyExists {
-		log.Fatal(err)
+	for _, constraint := range constraints {
+		_, err := session.Run(ctx, constraint, nil)
+		if err != nil && err.(*neo4j.Neo4jError).Code != EquivalentSchemaRuleAlreadyExists {
+			log.Fatal(err)
+		}
 	}
 }
