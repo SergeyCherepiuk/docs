@@ -34,20 +34,20 @@ func NewUserCreator() *userCreator {
 
 func NewUserGetter() *userGetter {
 	return &userGetter{
-		getByUsernameCypher: `MATCH (u:User {username: $username}) RETURN u.username as username, u.password as password`,
+		getByUsernameCypher: `MATCH (u:User {username: $username}) RETURN u`,
 	}
 }
 
 func NewUserUpdater() *userUpdater {
 	return &userUpdater{
-		updateUsernameCypher: `MATCH (u:User {username: $username}) SET u.username = $new_username RETURN COUNT(u) as count`,
-		updatePasswordCypher: `MATCH (u:User {username: $username}) SET u.password = $new_password RETURN COUNT(u) as count`,
+		updateUsernameCypher: `MATCH (u:User {username: $username}) SET u.username = $new_username RETURN COUNT(u) as c`,
+		updatePasswordCypher: `MATCH (u:User {username: $username}) SET u.password = $new_password RETURN COUNT(u) as c`,
 	}
 }
 
 func NewUserDeleter() *userDeleter {
 	return &userDeleter{
-		deleteCypher: `MATCH (u:User {username: $username})-[r]-(f:File) DELETE u, r, f`,
+		deleteCypher: `MATCH (u:User {username: $username}) OPTIONAL MATCH (u)-[r:OWNS]->(f:File) DETACH DELETE u, r, f`,
 	}
 }
 
@@ -84,7 +84,7 @@ func (ug userGetter) GetByUsername(ctx context.Context, username string) (domain
 		return domain.User{}, fmt.Errorf("failed to get the user from the database")
 	}
 
-	return internal.GetSingle[domain.User](ctx, result)
+	return internal.GetSingle[domain.User](ctx, result, "u")
 }
 
 func (uu userUpdater) UpdateUsername(ctx context.Context, user domain.User, newUsername string) error {
@@ -105,7 +105,7 @@ func (uu userUpdater) UpdateUsername(ctx context.Context, user domain.User, newU
 		}
 	}
 
-	if count, err := internal.GetSingle[int64](ctx, result); count <= 0 || err != nil {
+	if count, err := internal.GetSingle[int64](ctx, result, "c"); count <= 0 || err != nil {
 		return fmt.Errorf("user wasn't found")
 	}
 
@@ -126,7 +126,7 @@ func (uu userUpdater) UpdatePassword(ctx context.Context, user domain.User, newP
 		return fmt.Errorf("failed to update user's password")
 	}
 
-	if count, err := internal.GetSingle[int64](ctx, result); count <= 0 || err != nil {
+	if count, err := internal.GetSingle[int64](ctx, result, "c"); count <= 0 || err != nil {
 		return fmt.Errorf("user wasn't found")
 	}
 

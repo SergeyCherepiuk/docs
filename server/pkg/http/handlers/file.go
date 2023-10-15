@@ -36,7 +36,7 @@ func NewFileHandler(
 
 func (h fileHandler) Create(c echo.Context) error {
 	// TODO: Replace hardcoded username with getting it from the sessionId
-	username := "qwe"
+	username := "johndoe"
 
 	user, err := h.userGetter.GetByUsername(context.Background(), username)
 	if err != nil {
@@ -94,7 +94,11 @@ func (h fileHandler) GetAll(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, internal.ToSentence(err.Error()))
 	}
 
-	return c.JSON(http.StatusOK, files)
+	response := struct {
+		Owner domain.User   `json:"owner"`
+		Files []domain.File `json:"files"`
+	}{user, files}
+	return c.JSON(http.StatusOK, response)
 }
 
 type fileUpdates struct {

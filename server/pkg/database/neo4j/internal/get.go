@@ -8,18 +8,17 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-// TODO: Optimize, eliminating the need to return every property in the query
-
 var (
 	ErrNoRecords        = fmt.Errorf("no records found")
 	ErrNilRecord        = fmt.Errorf("record is nil")
 	ErrInvalidValue     = fmt.Errorf("value is invalid")
 	ErrCannotSetValue   = fmt.Errorf("value cannot be set")
+	ErrNodeNotFound     = fmt.Errorf("node not found")
 	ErrPropertyNotFound = fmt.Errorf("property not found")
 	ErrTypeMismatch     = fmt.Errorf("value and node's property have different types")
 )
 
-func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext) (T, error) {
+func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext, variable string) (T, error) {
 	var value T
 
 	record, err := result.Single(ctx)
@@ -27,13 +26,13 @@ func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext) (T, e
 		return value, ErrNoRecords
 	}
 
-	if reflect.ValueOf(value).Kind() == reflect.Struct {
-		return collectStruct[T](ctx, record)
+	if reflect.TypeOf(value).Kind() == reflect.Struct {
+		return collectStruct[T](ctx, record, variable)
 	}
-	return collect[T](ctx, record)
+	return collectPrimitive[T](ctx, record, variable)
 }
 
-func GetMultiple[T any](ctx context.Context, result neo4j.ResultWithContext) ([]T, error) {
+func GetMultiple[T any](ctx context.Context, result neo4j.ResultWithContext, variable string) ([]T, error) {
 	records, err := result.Collect(ctx)
 	if records == nil || len(records) <= 0 || err != nil {
 		return nil, ErrNoRecords
@@ -44,9 +43,9 @@ func GetMultiple[T any](ctx context.Context, result neo4j.ResultWithContext) ([]
 		var value T
 		var err error
 		if reflect.ValueOf(value).Kind() == reflect.Struct {
-			value, err = collectStruct[T](ctx, record)
+			value, err = collectStruct[T](ctx, record, variable)
 		} else {
-			value, err = collect[T](ctx, record)
+			value, err = collectPrimitive[T](ctx, record, variable)
 		}
 		if err != nil {
 			return nil, err
@@ -57,7 +56,7 @@ func GetMultiple[T any](ctx context.Context, result neo4j.ResultWithContext) ([]
 	return values, nil
 }
 
-func collect[T any](ctx context.Context, record *neo4j.Record) (T, error) {
+func collectPrimitive[T any](ctx context.Context, record *neo4j.Record, variable string) (T, error) {
 	var value T
 
 	if record == nil {
@@ -71,7 +70,12 @@ func collect[T any](ctx context.Context, record *neo4j.Record) (T, error) {
 		return value, ErrCannotSetValue
 	}
 
-	pv := reflect.ValueOf(record.Values[0])
+	primitive, found := record.Get(variable)
+	if !found {
+		return value, ErrNodeNotFound
+	}
+
+	pv := reflect.ValueOf(primitive)
 	if rv.Kind() != pv.Kind() {
 		return value, ErrTypeMismatch
 	}
@@ -81,15 +85,21 @@ func collect[T any](ctx context.Context, record *neo4j.Record) (T, error) {
 	return value, nil
 }
 
-func collectStruct[T any](ctx context.Context, record *neo4j.Record) (T, error) {
+func collectStruct[T any](ctx context.Context, record *neo4j.Record, variable string) (T, error) {
 	var value T
 
 	if record == nil {
 		return value, ErrNilRecord
 	}
 
+	node, found := record.Get(variable)
+	if !found {
+		return value, ErrNodeNotFound
+	}
+
 	rt := reflect.TypeOf(&value).Elem()
 	rv := reflect.ValueOf(&value).Elem()
+
 	for i := 0; i < rt.NumField(); i++ {
 		tag := rt.Field(i).Tag.Get("prop")
 		if tag == "" {
@@ -103,7 +113,12 @@ func collectStruct[T any](ctx context.Context, record *neo4j.Record) (T, error) 
 			return value, ErrCannotSetValue
 		}
 
-		property, found := record.Get(tag)
+		neo4jNode, ok := node.(neo4j.Node)
+		if !ok {
+			return value, ErrNodeNotFound
+		}
+
+		property, found := neo4jNode.Props[tag]
 		if !found {
 			return value, ErrPropertyNotFound
 		}

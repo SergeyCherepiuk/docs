@@ -36,15 +36,15 @@ func NewFileCreator() *fileCreator {
 
 func NewFileGetter() *fileGetter {
 	return &fileGetter{
-		getByIdCypher:        `MATCH (f:File {id: $id}) RETURN f.id as id, f.name as name`,
-		getOwnerCypher:       `MATCH (u:User)-[:OWNS]->(f:File {id: $id}) RETURN u.username as username, u.password as password`,
-		getAllForOwnerCypher: `MATCH (u:User {username: $username})-[:OWNS]->(f:File) RETURN f.id as id, f.name as name`,
+		getByIdCypher:        `MATCH (f:File {id: $id}) RETURN f`,
+		getOwnerCypher:       `MATCH (u:User)-[:OWNS]->(f:File {id: $id}) RETURN u`,
+		getAllForOwnerCypher: `MATCH (u:User {username: $username})-[:OWNS]->(f:File) RETURN f`,
 	}
 }
 
 func NewFileUpdater() *fileUpdater {
 	return &fileUpdater{
-		updateNameCypher: `MATCH (f:File {id: $id}) SET f.name = $new_name RETURN COUNT(f) as count`,
+		updateNameCypher: `MATCH (f:File {id: $id}) SET f.name = $new_name RETURN COUNT(f) as c`,
 	}
 }
 
@@ -90,7 +90,7 @@ func (fg fileGetter) GetById(ctx context.Context, id string) (domain.File, error
 		return domain.File{}, fmt.Errorf("file to get the file from the database")
 	}
 
-	return internal.GetSingle[domain.File](ctx, result)
+	return internal.GetSingle[domain.File](ctx, result, "f")
 }
 
 func (fg fileGetter) GetOwner(ctx context.Context, file domain.File) (domain.User, error) {
@@ -106,7 +106,7 @@ func (fg fileGetter) GetOwner(ctx context.Context, file domain.File) (domain.Use
 		return domain.User{}, fmt.Errorf("failed to get the file's owner from the database")
 	}
 
-	return internal.GetSingle[domain.User](ctx, result)
+	return internal.GetSingle[domain.User](ctx, result, "u")
 }
 
 func (fg fileGetter) GetAllForOwner(ctx context.Context, owner domain.User) ([]domain.File, error) {
@@ -122,7 +122,7 @@ func (fg fileGetter) GetAllForOwner(ctx context.Context, owner domain.User) ([]d
 		return []domain.File{}, fmt.Errorf("failed to get all files for owner from the database")
 	}
 
-	return internal.GetMultiple[domain.File](ctx, result)
+	return internal.GetMultiple[domain.File](ctx, result, "f")
 }
 
 func (fu fileUpdater) UpdateName(ctx context.Context, file domain.File, name string) error {
@@ -139,7 +139,7 @@ func (fu fileUpdater) UpdateName(ctx context.Context, file domain.File, name str
 		return fmt.Errorf("failed to update file's name")
 	}
 
-	if count, err := internal.GetSingle[int64](ctx, result); count <= 0 || err != nil {
+	if count, err := internal.GetSingle[int64](ctx, result, "c"); count <= 0 || err != nil {
 		return fmt.Errorf("file wasn't found")
 	}
 
