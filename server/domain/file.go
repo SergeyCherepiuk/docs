@@ -10,11 +10,13 @@ type File struct {
 }
 
 type FileCreator interface {
-	Create(ctx context.Context, file File) error
+	Create(ctx context.Context, file File, owner User) error
 }
 
 type FileGetter interface {
 	GetById(ctx context.Context, id string) (File, error)
+	GetOwner(ctx context.Context, file File) (User, error)
+	GetAllForOwner(ctx context.Context, owner User) ([]File, error)
 }
 
 type FileUpdater interface {
@@ -23,4 +25,5 @@ type FileUpdater interface {
 
 type FileDeleter interface {
 	Delete(ctx context.Context, file File) error
+	DeleteAllForOwner(ctx context.Context, owner User) error
 }

@@ -8,6 +8,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+// TODO: Optimize, eliminating the need to return every property in the query
+
 var (
 	ErrNoRecords        = fmt.Errorf("no records found")
 	ErrNilRecord        = fmt.Errorf("record is nil")

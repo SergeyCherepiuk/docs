@@ -14,22 +14,31 @@ type fileCreator struct {
 }
 
 type fileGetter struct {
-	getByIdCypher string
+	getByIdCypher        string
+	getOwnerCypher       string
+	getAllForOwnerCypher string
 }
 
 type fileUpdater struct {
 	updateNameCypher string
 }
 
+type fileDeleter struct {
+	deleteCypher            string
+	deleteAllForOwnerCypher string
+}
+
 func NewFileCreator() *fileCreator {
 	return &fileCreator{
-		createCypher: `CREATE (f:File {id: $id, name: $name})`,
+		createCypher: `MATCH (u:User {username: $username}) CREATE (u)-[:OWNS]->(f:File {id: $id, name: $name})`,
 	}
 }
 
 func NewFileGetter() *fileGetter {
 	return &fileGetter{
-		getByIdCypher: `MATCH (f:File {id: $id}) RETURN f.id as id, f.name as name`,
+		getByIdCypher:        `MATCH (f:File {id: $id}) RETURN f.id as id, f.name as name`,
+		getOwnerCypher:       `MATCH (u:User)-[:OWNS]->(f:File {id: $id}) RETURN u.username as username, u.password as password`,
+		getAllForOwnerCypher: `MATCH (u:User {username: $username})-[:OWNS]->(f:File) RETURN f.id as id, f.name as name`,
 	}
 }
 
@@ -39,13 +48,21 @@ func NewFileUpdater() *fileUpdater {
 	}
 }
 
-func (fc fileCreator) Create(ctx context.Context, file domain.File) error {
+func NewFileDeleter() *fileDeleter {
+	return &fileDeleter{
+		deleteCypher:            `MATCH (f:File {id: $id}) DETACH DELETE f`,
+		deleteAllForOwnerCypher: `MATCH (u:User {username: $username})-[:OWNS]->(f:File) DETACH DELETE f`,
+	}
+}
+
+func (fc fileCreator) Create(ctx context.Context, file domain.File, owner domain.User) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
 
 	params := map[string]any{
-		"id":   file.Id,
-		"name": file.Name,
+		"username": owner.Username,
+		"id":       file.Id,
+		"name":     file.Name,
 	}
 
 	_, err := session.Run(ctx, fc.createCypher, params)
@@ -53,7 +70,6 @@ func (fc fileCreator) Create(ctx context.Context, file domain.File) error {
 		if neo4jErr, ok := err.(*neo4j.Neo4jError); ok && neo4jErr.Code == ConstraintValidationFailed {
 			return fmt.Errorf("file with this id already exists")
 		} else {
-			fmt.Println(err.Error())
 			return fmt.Errorf("failed to store the file in the database")
 		}
 	}
@@ -77,6 +93,38 @@ func (fg fileGetter) GetById(ctx context.Context, id string) (domain.File, error
 	return internal.GetSingle[domain.File](ctx, result)
 }
 
+func (fg fileGetter) GetOwner(ctx context.Context, file domain.File) (domain.User, error) {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"id": file.Id,
+	}
+
+	result, err := session.Run(ctx, fg.getOwnerCypher, params)
+	if err != nil {
+		return domain.User{}, fmt.Errorf("failed to get the file's owner from the database")
+	}
+
+	return internal.GetSingle[domain.User](ctx, result)
+}
+
+func (fg fileGetter) GetAllForOwner(ctx context.Context, owner domain.User) ([]domain.File, error) {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"username": owner.Username,
+	}
+
+	result, err := session.Run(ctx, fg.getAllForOwnerCypher, params)
+	if err != nil {
+		return []domain.File{}, fmt.Errorf("failed to get all files for owner from the database")
+	}
+
+	return internal.GetMultiple[domain.File](ctx, result)
+}
+
 func (fu fileUpdater) UpdateName(ctx context.Context, file domain.File, name string) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
@@ -93,6 +141,36 @@ func (fu fileUpdater) UpdateName(ctx context.Context, file domain.File, name str
 
 	if count, err := internal.GetSingle[int64](ctx, result); count <= 0 || err != nil {
 		return fmt.Errorf("file wasn't found")
+	}
+
+	return nil
+}
+
+func (fd fileDeleter) Delete(ctx context.Context, file domain.File) error {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"id": file.Id,
+	}
+
+	if _, err := session.Run(ctx, fd.deleteCypher, params); err != nil {
+		return fmt.Errorf("failed to delete the file")
+	}
+
+	return nil
+}
+
+func (fd fileDeleter) DeleteAllForOwner(ctx context.Context, owner domain.User) error {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"username": owner.Username,
+	}
+
+	if _, err := session.Run(ctx, fd.deleteAllForOwnerCypher, params); err != nil {
+		return fmt.Errorf("failed to delete all files for owner")
 	}
 
 	return nil

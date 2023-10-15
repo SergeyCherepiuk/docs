@@ -47,7 +47,7 @@ func NewUserUpdater() *userUpdater {
 
 func NewUserDeleter() *userDeleter {
 	return &userDeleter{
-		deleteCypher: `MATCH (u:User {username: $username}) DELETE u RETURN COUNT(u) as count`,
+		deleteCypher: `MATCH (u:User {username: $username})-[r]-(f:File) DELETE u, r, f`,
 	}
 }
 
