@@ -8,14 +8,16 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
+// TODO: Review errors
 var (
-	ErrNoRecords        = fmt.Errorf("no records found")
-	ErrNilRecord        = fmt.Errorf("record is nil")
-	ErrInvalidValue     = fmt.Errorf("value is invalid")
-	ErrCannotSetValue   = fmt.Errorf("value cannot be set")
-	ErrNodeNotFound     = fmt.Errorf("node not found")
-	ErrPropertyNotFound = fmt.Errorf("property not found")
-	ErrTypeMismatch     = fmt.Errorf("value and node's property have different types")
+	ErrNoRecords           = fmt.Errorf("no records found")
+	ErrNilRecord           = fmt.Errorf("record is nil")
+	ErrInvalidValue        = fmt.Errorf("value is invalid")
+	ErrCannotSetValue      = fmt.Errorf("value cannot be set")
+	ErrVariableNotFound    = fmt.Errorf("variable not found")
+	ErrInvalidVariableType = fmt.Errorf("invalid variable type")
+	ErrPropertyNotFound    = fmt.Errorf("property not found")
+	ErrTypeMismatch        = fmt.Errorf("value and node's property have different types")
 )
 
 func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext, variable string) (T, error) {
@@ -72,7 +74,7 @@ func collectPrimitive[T any](ctx context.Context, record *neo4j.Record, variable
 
 	primitive, found := record.Get(variable)
 	if !found {
-		return value, ErrNodeNotFound
+		return value, ErrVariableNotFound
 	}
 
 	pv := reflect.ValueOf(primitive)
@@ -92,9 +94,9 @@ func collectStruct[T any](ctx context.Context, record *neo4j.Record, variable st
 		return value, ErrNilRecord
 	}
 
-	node, found := record.Get(variable)
+	v, found := record.Get(variable)
 	if !found {
-		return value, ErrNodeNotFound
+		return value, ErrVariableNotFound
 	}
 
 	rt := reflect.TypeOf(&value).Elem()
@@ -113,12 +115,18 @@ func collectStruct[T any](ctx context.Context, record *neo4j.Record, variable st
 			return value, ErrCannotSetValue
 		}
 
-		neo4jNode, ok := node.(neo4j.Node)
-		if !ok {
-			return value, ErrNodeNotFound
+		var property any
+		var found bool
+
+		switch v := v.(type) {
+		case neo4j.Node:
+			property, found = v.Props[tag]
+		case map[string]any:
+			property, found = v[tag]
+		default:
+			return value, ErrInvalidVariableType
 		}
 
-		property, found := neo4jNode.Props[tag]
 		if !found {
 			return value, ErrPropertyNotFound
 		}

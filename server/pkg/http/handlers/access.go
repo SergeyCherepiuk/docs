@@ -12,15 +12,18 @@ import (
 
 type accessHandler struct {
 	accessGranter domain.AccessGranter
+	accessGetter  domain.AccessGetter
 	fileGetter    domain.FileGetter
 }
 
 func NewAccessHandler(
 	accessGranter domain.AccessGranter,
+	accessGetter domain.AccessGetter,
 	fileGetter domain.FileGetter,
 ) *accessHandler {
 	return &accessHandler{
 		accessGranter: accessGranter,
+		accessGetter:  accessGetter,
 		fileGetter:    fileGetter,
 	}
 }
@@ -42,6 +45,8 @@ func (h accessHandler) Grant(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
 	}
 
+	// TODO: Check if both users (granter and receiver) exist
+
 	// TODO (?): Extract ownership checks into a middleware
 	user, err := h.fileGetter.GetOwner(context.Background(), file)
 	if err != nil {
@@ -59,4 +64,23 @@ func (h accessHandler) Grant(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusCreated)
+}
+
+func (h accessHandler) GetAccesses(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file id")
+	}
+
+	file, err := h.fileGetter.GetById(context.Background(), id.String())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
+	}
+
+	accesses, err := h.accessGetter.GetAccesses(context.Background(), file)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
+	}
+
+	return c.JSON(http.StatusOK, accesses)
 }
