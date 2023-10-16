@@ -49,7 +49,7 @@ func (h userHandler) Create(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 
-	return c.NoContent(http.StatusOK)
+	return c.NoContent(http.StatusCreated)
 }
 
 func (h userHandler) GetByUsername(c echo.Context) error {

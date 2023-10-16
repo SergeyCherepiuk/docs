@@ -55,7 +55,7 @@ func (h fileHandler) Create(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 
-	return c.NoContent(http.StatusOK)
+	return c.NoContent(http.StatusCreated)
 }
 
 func (h fileHandler) Get(c echo.Context) error {
