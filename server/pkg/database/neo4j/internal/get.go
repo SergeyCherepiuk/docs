@@ -12,95 +12,94 @@ import (
 var (
 	ErrNoRecords           = fmt.Errorf("no records found")
 	ErrNilRecord           = fmt.Errorf("record is nil")
-	ErrInvalidValue        = fmt.Errorf("value is invalid")
-	ErrCannotSetValue      = fmt.Errorf("value cannot be set")
-	ErrVariableNotFound    = fmt.Errorf("variable not found")
-	ErrInvalidVariableType = fmt.Errorf("invalid variable type")
-	ErrPropertyNotFound    = fmt.Errorf("property not found")
+	ErrInvalidVariable     = fmt.Errorf("variable is invalid")
+	ErrVariableCannotBeSet = fmt.Errorf("variable cannot be set")
+	ErrValueNotFound       = fmt.Errorf("value not found")
+	ErrInvalidValueType    = fmt.Errorf("invalid value type")
 	ErrTypeMismatch        = fmt.Errorf("value and node's property have different types")
 )
 
-func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext, variable string) (T, error) {
-	var value T
+func GetSingle[T any](ctx context.Context, result neo4j.ResultWithContext, alias string) (T, error) {
+	var variable T
 
 	record, err := result.Single(ctx)
 	if record == nil || err != nil {
-		return value, ErrNoRecords
+		return variable, ErrNoRecords
 	}
 
-	if reflect.TypeOf(value).Kind() == reflect.Struct {
-		return collectStruct[T](ctx, record, variable)
+	if reflect.TypeOf(variable).Kind() == reflect.Struct {
+		return collectStruct[T](ctx, record, alias)
 	}
-	return collectPrimitive[T](ctx, record, variable)
+	return collectPrimitive[T](ctx, record, alias)
 }
 
-func GetMultiple[T any](ctx context.Context, result neo4j.ResultWithContext, variable string) ([]T, error) {
+func GetMultiple[T any](ctx context.Context, result neo4j.ResultWithContext, alias string) ([]T, error) {
 	records, err := result.Collect(ctx)
 	if records == nil || len(records) <= 0 || err != nil {
 		return nil, ErrNoRecords
 	}
 
-	values := make([]T, len(records))
+	variables := make([]T, len(records))
 	for i, record := range records {
-		var value T
+		var variable T
 		var err error
-		if reflect.ValueOf(value).Kind() == reflect.Struct {
-			value, err = collectStruct[T](ctx, record, variable)
+		if reflect.ValueOf(variable).Kind() == reflect.Struct {
+			variable, err = collectStruct[T](ctx, record, alias)
 		} else {
-			value, err = collectPrimitive[T](ctx, record, variable)
+			variable, err = collectPrimitive[T](ctx, record, alias)
 		}
 		if err != nil {
 			return nil, err
 		}
-		values[i] = value
+		variables[i] = variable
 	}
 
-	return values, nil
+	return variables, nil
 }
 
-func collectPrimitive[T any](ctx context.Context, record *neo4j.Record, variable string) (T, error) {
-	var value T
+func collectPrimitive[T any](ctx context.Context, record *neo4j.Record, alias string) (T, error) {
+	var variable T
 
 	if record == nil {
-		return value, ErrNilRecord
+		return variable, ErrNilRecord
 	}
 
-	rv := reflect.ValueOf(&value).Elem()
+	rv := reflect.ValueOf(&variable).Elem()
 	if !rv.IsValid() {
-		return value, ErrInvalidValue
+		return variable, ErrInvalidVariable
 	} else if !rv.CanSet() {
-		return value, ErrCannotSetValue
+		return variable, ErrVariableCannotBeSet
 	}
 
-	primitive, found := record.Get(variable)
+	value, found := record.Get(alias)
 	if !found {
-		return value, ErrVariableNotFound
+		return variable, ErrValueNotFound
 	}
 
-	pv := reflect.ValueOf(primitive)
+	pv := reflect.ValueOf(value)
 	if rv.Kind() != pv.Kind() {
-		return value, ErrTypeMismatch
+		return variable, ErrTypeMismatch
 	}
 
 	rv.Set(pv)
 
-	return value, nil
+	return variable, nil
 }
 
-func collectStruct[T any](ctx context.Context, record *neo4j.Record, variable string) (T, error) {
-	var value T
+func collectStruct[T any](ctx context.Context, record *neo4j.Record, alias string) (T, error) {
+	var variable T
 
 	if record == nil {
-		return value, ErrNilRecord
+		return variable, ErrNilRecord
 	}
 
-	v, found := record.Get(variable)
+	value, found := record.Get(alias)
 	if !found {
-		return value, ErrVariableNotFound
+		return variable, ErrValueNotFound
 	}
 
-	rt := reflect.TypeOf(&value).Elem()
-	rv := reflect.ValueOf(&value).Elem()
+	rt := reflect.TypeOf(&variable).Elem()
+	rv := reflect.ValueOf(&variable).Elem()
 
 	for i := 0; i < rt.NumField(); i++ {
 		tag := rt.Field(i).Tag.Get("prop")
@@ -110,34 +109,34 @@ func collectStruct[T any](ctx context.Context, record *neo4j.Record, variable st
 
 		fv := rv.Field(i)
 		if !fv.IsValid() {
-			return value, ErrInvalidValue
+			return variable, ErrInvalidVariable
 		} else if !fv.CanSet() {
-			return value, ErrCannotSetValue
+			return variable, ErrVariableCannotBeSet
 		}
 
 		var property any
 		var found bool
 
-		switch v := v.(type) {
+		switch value := value.(type) {
 		case neo4j.Node:
-			property, found = v.Props[tag]
+			property, found = value.Props[tag]
 		case map[string]any:
-			property, found = v[tag]
+			property, found = value[tag]
 		default:
-			return value, ErrInvalidVariableType
+			return variable, ErrInvalidValueType
 		}
 
 		if !found {
-			return value, ErrPropertyNotFound
+			return variable, ErrValueNotFound
 		}
 
 		pv := reflect.ValueOf(property)
 		if fv.Kind() != pv.Kind() {
-			return value, ErrTypeMismatch
+			return variable, ErrTypeMismatch
 		}
 
 		fv.Set(pv)
 	}
 
-	return value, nil
+	return variable, nil
 }
