@@ -21,7 +21,7 @@
     onMount(() => {
         let area = document.getElementById("area") as HTMLTextAreaElement
 
-        let socket = new WebSocket("ws://localhost:3000/api/connect")
+        let socket = new WebSocket("ws://localhost:3000/api/v1/connect")
         socket.onopen = () => send({ messageType: "user", rawMessage: $user })
         socket.onmessage = e => {
             // TODO: Sanitize corresponding of the data on disconnect message

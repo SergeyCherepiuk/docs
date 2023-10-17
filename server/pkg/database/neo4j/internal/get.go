@@ -8,7 +8,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-// TODO: Review errors
 var (
 	ErrNoRecords           = fmt.Errorf("no records found")
 	ErrNilRecord           = fmt.Errorf("record is nil")

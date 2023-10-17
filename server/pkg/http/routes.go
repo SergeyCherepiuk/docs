@@ -28,8 +28,9 @@ func (r Router) Build() *echo.Echo {
 	)
 
 	var (
-		accessGrater = neo4j.NewAccessGranter()
-		accessGetter = neo4j.NewAccessGetter()
+		accessGrater  = neo4j.NewAccessGranter()
+		accessGetter  = neo4j.NewAccessGetter()
+		accessUpdater = neo4j.NewAccessUpdater()
 	)
 
 	var (
@@ -40,7 +41,7 @@ func (r Router) Build() *echo.Echo {
 			fileCreator, fileGetter, fileUpdater, fileDeleter, userGetter,
 		)
 		accessHandler = handlers.NewAccessHandler(
-			accessGrater, accessGetter, fileGetter,
+			accessGrater, accessGetter, accessUpdater, fileGetter, userGetter,
 		)
 	)
 

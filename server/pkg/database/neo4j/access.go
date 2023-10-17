@@ -15,7 +15,12 @@ type accessGranter struct {
 }
 
 type accessGetter struct {
+	getCypher          string
 	getAccessorsCypher string
+}
+
+type accessUpdater struct {
+	updateLevelCypher string
 }
 
 func NewAccessGranter() *accessGranter {
@@ -27,7 +32,14 @@ func NewAccessGranter() *accessGranter {
 
 func NewAccessGetter() *accessGetter {
 	return &accessGetter{
-		getAccessorsCypher: `MATCH (u:User)-[a:CAN_ACCESS]->(f:File {id: $id}) RETURN {granter: a.grantedBy, receiver: u.username, level: a.level} as accesses`,
+		getCypher:          `MATCH (u:User {username: $username})-[a:CAN_ACCESS]->(f:File {id: $id}) RETURN {granter: a.grantedBy, receiver: u.username, level: a.level} as a`,
+		getAccessorsCypher: `MATCH (u:User)-[a:CAN_ACCESS]->(f:File {id: $id}) RETURN {granter: a.grantedBy, receiver: u.username, level: a.level} as a`,
+	}
+}
+
+func NewAccessUpdater() *accessUpdater {
+	return &accessUpdater{
+		updateLevelCypher: `MATCH (u:User {username: $receiver})-[a:CAN_ACCESS {grantedBy: $granter}]->(f:File {id: $id}) SET a.level = $new_level RETURN COUNT(a) as c`,
 	}
 }
 
@@ -57,6 +69,23 @@ func (ag accessGranter) Grant(ctx context.Context, file domain.File, access doma
 	return nil
 }
 
+func (ag accessGetter) Get(ctx context.Context, file domain.File, user domain.User) (domain.Access, error) {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"username": user.Username,
+		"id":       file.Id,
+	}
+
+	result, err := session.Run(ctx, ag.getCypher, params)
+	if err != nil {
+		return domain.Access{}, fmt.Errorf("failed to get get the file access")
+	}
+
+	return internal.GetSingle[domain.Access](ctx, result, "a")
+}
+
 func (ag accessGetter) GetAccesses(ctx context.Context, file domain.File) ([]domain.Access, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
@@ -70,5 +99,28 @@ func (ag accessGetter) GetAccesses(ctx context.Context, file domain.File) ([]dom
 		return nil, fmt.Errorf("failed to get accessors")
 	}
 
-	return internal.GetMultiple[domain.Access](ctx, result, "accesses")
+	return internal.GetMultiple[domain.Access](ctx, result, "a")
+}
+
+func (au accessUpdater) UpdateLevel(ctx context.Context, file domain.File, access domain.Access, newLevel string) error {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"receiver":  access.Receiver,
+		"granter":   access.Granter,
+		"id":        file.Id,
+		"new_level": newLevel,
+	}
+
+	result, err := session.Run(ctx, au.updateLevelCypher, params)
+	if err != nil {
+		return fmt.Errorf("failed to update access level")
+	}
+
+	if count, err := internal.GetSingle[int64](ctx, result, "c"); count <= 0 || err != nil {
+		return fmt.Errorf("access record wasn't found")
+	}
+
+	return nil
 }

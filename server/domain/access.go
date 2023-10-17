@@ -20,11 +20,12 @@ type AccessGranter interface {
 }
 
 type AccessGetter interface {
+	Get(ctx context.Context, file File, user User) (Access, error)
 	GetAccesses(ctx context.Context, file File) ([]Access, error)
 }
 
-type AccessChecker interface {
-	Check(ctx context.Context, file File, user User) (bool, error)
+type AccessUpdater interface {
+	UpdateLevel(ctx context.Context, file File, access Access, newLevel string) error
 }
 
 type AccessRevoker interface {
