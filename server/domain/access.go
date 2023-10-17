@@ -29,5 +29,5 @@ type AccessUpdater interface {
 }
 
 type AccessRevoker interface {
-	Revoke(ctx context.Context, file File, user User) error
+	Revoke(ctx context.Context, file File, access Access) error
 }

@@ -31,6 +31,7 @@ func (r Router) Build() *echo.Echo {
 		accessGrater  = neo4j.NewAccessGranter()
 		accessGetter  = neo4j.NewAccessGetter()
 		accessUpdater = neo4j.NewAccessUpdater()
+		accessRevoker = neo4j.NewAccessRevoker()
 	)
 
 	var (
@@ -41,7 +42,7 @@ func (r Router) Build() *echo.Echo {
 			fileCreator, fileGetter, fileUpdater, fileDeleter, userGetter,
 		)
 		accessHandler = handlers.NewAccessHandler(
-			accessGrater, accessGetter, accessUpdater, fileGetter, userGetter,
+			accessGrater, accessGetter, accessUpdater, accessRevoker, fileGetter, userGetter,
 		)
 	)
 
@@ -65,6 +66,7 @@ func (r Router) Build() *echo.Echo {
 	access := file.Group("/access")
 	access.POST("/:id", accessHandler.Grant)
 	access.GET("/:id", accessHandler.GetAccesses)
+	access.DELETE("/:id/:username", accessHandler.Revoke)
 
 	return e
 }

@@ -14,14 +14,16 @@ type accessHandler struct {
 	accessGranter domain.AccessGranter
 	accessGetter  domain.AccessGetter
 	accessUpdater domain.AccessUpdater
+	accessRevoker domain.AccessRevoker
 	fileGetter    domain.FileGetter
-	userGetter domain.UserGetter
+	userGetter    domain.UserGetter
 }
 
 func NewAccessHandler(
 	accessGranter domain.AccessGranter,
 	accessGetter domain.AccessGetter,
 	accessUpdater domain.AccessUpdater,
+	accessRevoker domain.AccessRevoker,
 	fileGetter domain.FileGetter,
 	userGetter domain.UserGetter,
 ) *accessHandler {
@@ -29,8 +31,9 @@ func NewAccessHandler(
 		accessGranter: accessGranter,
 		accessGetter:  accessGetter,
 		accessUpdater: accessUpdater,
+		accessRevoker: accessRevoker,
 		fileGetter:    fileGetter,
-		userGetter: userGetter,
+		userGetter:    userGetter,
 	}
 }
 
@@ -67,7 +70,7 @@ func (h accessHandler) Grant(c echo.Context) error {
 	}
 
 	access, err := h.accessGetter.Get(context.Background(), file, receiver)
-	if err != nil {	
+	if err != nil {
 		if err := h.accessGranter.Grant(context.Background(), file, accessBody); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
@@ -97,4 +100,33 @@ func (h accessHandler) GetAccesses(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, accesses)
+}
+
+func (h accessHandler) Revoke(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file id")
+	}
+
+	file, err := h.fileGetter.GetById(context.Background(), id.String())
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
+	}
+
+	username := c.Param("username")
+	user, err := h.userGetter.GetByUsername(context.Background(), username)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
+	}
+
+	access, err := h.accessGetter.Get(context.Background(), file, user)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
+	}
+
+	if err := h.accessRevoker.Revoke(context.Background(), file, access); err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
+	}
+
+	return c.NoContent(http.StatusOK)
 }

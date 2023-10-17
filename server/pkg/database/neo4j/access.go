@@ -23,6 +23,10 @@ type accessUpdater struct {
 	updateLevelCypher string
 }
 
+type accessRevoker struct {
+	revokeCypher string
+}
+
 func NewAccessGranter() *accessGranter {
 	return &accessGranter{
 		grantReadCypher:      `MATCH (u:User {username: $receiver}), (f:File {id: $id}) CREATE (u)-[:CAN_ACCESS {level: "R", grantedBy: $granter}]->(f)`,
@@ -40,6 +44,12 @@ func NewAccessGetter() *accessGetter {
 func NewAccessUpdater() *accessUpdater {
 	return &accessUpdater{
 		updateLevelCypher: `MATCH (u:User {username: $receiver})-[a:CAN_ACCESS {grantedBy: $granter}]->(f:File {id: $id}) SET a.level = $new_level RETURN COUNT(a) as c`,
+	}
+}
+
+func NewAccessRevoker() *accessRevoker {
+	return &accessRevoker{
+		revokeCypher: `MATCH (u:User {username: $receiver})-[a:CAN_ACCESS {grantedBy: $granter}]->(f:File {id: $id}) DELETE a`,
 	}
 }
 
@@ -120,6 +130,23 @@ func (au accessUpdater) UpdateLevel(ctx context.Context, file domain.File, acces
 
 	if count, err := internal.GetSingle[int64](ctx, result, "c"); count <= 0 || err != nil {
 		return fmt.Errorf("access record wasn't found")
+	}
+
+	return nil
+}
+
+func (ar accessRevoker) Revoke(ctx context.Context, file domain.File, access domain.Access) error {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+
+	params := map[string]any{
+		"receiver": access.Receiver,
+		"granter":  access.Granter,
+		"id":       file.Id,
+	}
+
+	if _, err := session.Run(ctx, ar.revokeCypher, params); err != nil {
+		return fmt.Errorf("failed to revoke the access")
 	}
 
 	return nil
