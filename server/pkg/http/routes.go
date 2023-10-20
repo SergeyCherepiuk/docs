@@ -1,7 +1,6 @@
 package http
 
 import (
-	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
 	"github.com/SergeyCherepiuk/docs/pkg/http/handlers"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -14,36 +13,9 @@ func (r Router) Build() *echo.Echo {
 	e.Use(middleware.Logger())
 
 	var (
-		userCreator = neo4j.NewUserCreator()
-		userGetter  = neo4j.NewUserGetter()
-		userUpdater = neo4j.NewUserUpdater()
-		userDeleter = neo4j.NewUserDeleter()
-	)
-
-	var (
-		fileCreator = neo4j.NewFileCreator()
-		fileGetter  = neo4j.NewFileGetter()
-		fileUpdater = neo4j.NewFileUpdater()
-		fileDeleter = neo4j.NewFileDeleter()
-	)
-
-	var (
-		accessGrater  = neo4j.NewAccessGranter()
-		accessGetter  = neo4j.NewAccessGetter()
-		accessUpdater = neo4j.NewAccessUpdater()
-		accessRevoker = neo4j.NewAccessRevoker()
-	)
-
-	var (
-		userHandler = handlers.NewUserHandler(
-			userCreator, userGetter, userUpdater, userDeleter,
-		)
-		fileHandler = handlers.NewFileHandler(
-			fileCreator, fileGetter, fileUpdater, fileDeleter, userGetter,
-		)
-		accessHandler = handlers.NewAccessHandler(
-			accessGrater, accessGetter, accessUpdater, accessRevoker, fileGetter, userGetter,
-		)
+		userHandler   = handlers.UserHandler{}
+		fileHandler   = handlers.FileHandler{}
+		accessHandler = handlers.AccessHandler{}
 	)
 
 	// TODO: Think about better API design

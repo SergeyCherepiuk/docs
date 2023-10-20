@@ -4,46 +4,25 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/SergeyCherepiuk/docs/domain"
+	"github.com/SergeyCherepiuk/docs/pkg/database/models"
+	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
 	"github.com/SergeyCherepiuk/docs/pkg/http/handlers/internal"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
-type fileHandler struct {
-	fileCreator domain.FileCreator
-	fileGetter  domain.FileGetter
-	fileUpdater domain.FileUpdater
-	fileDeleter domain.FileDeleter
-	userGetter  domain.UserGetter
-}
+type FileHandler struct{}
 
-func NewFileHandler(
-	fileCreator domain.FileCreator,
-	fileGetter domain.FileGetter,
-	fileUpdater domain.FileUpdater,
-	fileDeleter domain.FileDeleter,
-	userGetter domain.UserGetter,
-) *fileHandler {
-	return &fileHandler{
-		fileCreator: fileCreator,
-		fileGetter:  fileGetter,
-		fileUpdater: fileUpdater,
-		fileDeleter: fileDeleter,
-		userGetter:  userGetter,
-	}
-}
-
-func (h fileHandler) Create(c echo.Context) error {
+func (h FileHandler) Create(c echo.Context) error {
 	// TODO: Replace hardcoded username with getting it from the sessionId
 	username := "johndoe"
 
-	user, err := h.userGetter.GetByUsername(context.Background(), username)
+	user, err := neo4j.UserService.GetByUsername(context.Background(), username)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, internal.ToSentence(err.Error()))
 	}
 
-	var file domain.File
+	var file models.File
 	if err := c.Bind(&file); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
 	}
@@ -51,52 +30,52 @@ func (h fileHandler) Create(c echo.Context) error {
 
 	// TODO: Validation
 
-	if err := h.fileCreator.Create(context.Background(), file, user); err != nil {
+	if err := neo4j.FileService.Create(context.Background(), file, user); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 
 	return c.NoContent(http.StatusCreated)
 }
 
-func (h fileHandler) Get(c echo.Context) error {
+func (h FileHandler) Get(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file id")
 	}
 
-	file, err := h.fileGetter.GetById(context.Background(), id.String())
+	file, err := neo4j.FileService.GetById(context.Background(), id.String())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 
-	user, err := h.fileGetter.GetOwner(context.Background(), file)
+	user, err := neo4j.FileService.GetOwner(context.Background(), file)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 
 	response := struct {
-		File  domain.File `json:"file"`
-		Owner domain.User `json:"owner"`
+		File  models.File `json:"file"`
+		Owner models.User `json:"owner"`
 	}{file, user}
 	return c.JSON(http.StatusOK, response)
 }
 
-func (h fileHandler) GetAll(c echo.Context) error {
+func (h FileHandler) GetAll(c echo.Context) error {
 	username := c.Param("username")
 
-	user, err := h.userGetter.GetByUsername(context.Background(), username)
+	user, err := neo4j.UserService.GetByUsername(context.Background(), username)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, internal.ToSentence(err.Error()))
 	}
 
-	files, err := h.fileGetter.GetAllForOwner(context.Background(), user)
+	files, err := neo4j.FileService.GetAllForOwner(context.Background(), user)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, internal.ToSentence(err.Error()))
 	}
 
 	response := struct {
-		Owner domain.User   `json:"owner"`
-		Files []domain.File `json:"files"`
+		Owner models.User   `json:"owner"`
+		Files []models.File `json:"files"`
 	}{user, files}
 	return c.JSON(http.StatusOK, response)
 }
@@ -109,13 +88,13 @@ func (u fileUpdates) HasName() bool {
 	return u.NewName != ""
 }
 
-func (h fileHandler) Update(c echo.Context) error {
+func (h FileHandler) Update(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file id")
 	}
 
-	file, err := h.fileGetter.GetById(context.Background(), id.String())
+	file, err := neo4j.FileService.GetById(context.Background(), id.String())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
@@ -128,7 +107,7 @@ func (h fileHandler) Update(c echo.Context) error {
 	if updates.HasName() {
 		// TODO: Validation
 
-		if err := h.fileUpdater.UpdateName(context.Background(), file, updates.NewName); err != nil {
+		if err := neo4j.FileService.UpdateName(context.Background(), file, updates.NewName); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
 		return c.NoContent(http.StatusOK)
@@ -137,33 +116,33 @@ func (h fileHandler) Update(c echo.Context) error {
 	return c.NoContent(http.StatusBadRequest)
 }
 
-func (h fileHandler) Delete(c echo.Context) error {
+func (h FileHandler) Delete(c echo.Context) error {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file's id")
 	}
 
-	file, err := h.fileGetter.GetById(context.Background(), id.String())
+	file, err := neo4j.FileService.GetById(context.Background(), id.String())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 
-	if err := h.fileDeleter.Delete(context.Background(), file); err != nil {
+	if err := neo4j.FileService.Delete(context.Background(), file); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 
 	return c.NoContent(http.StatusOK)
 }
 
-func (h fileHandler) DeleteAllForOwner(c echo.Context) error {
+func (h FileHandler) DeleteAllForOwner(c echo.Context) error {
 	username := c.Param("username")
 
-	user, err := h.userGetter.GetByUsername(context.Background(), username)
+	user, err := neo4j.UserService.GetByUsername(context.Background(), username)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 
-	if err := h.fileDeleter.DeleteAllForOwner(context.Background(), user); err != nil {
+	if err := neo4j.FileService.DeleteAllForOwner(context.Background(), user); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 
