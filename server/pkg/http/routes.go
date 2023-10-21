@@ -13,6 +13,7 @@ func (r Router) Build() *echo.Echo {
 	e.Use(middleware.Logger())
 
 	var (
+		authHandler   = handlers.AuthHandler{}
 		userHandler   = handlers.UserHandler{}
 		fileHandler   = handlers.FileHandler{}
 		accessHandler = handlers.AccessHandler{}
@@ -21,8 +22,12 @@ func (r Router) Build() *echo.Echo {
 	// TODO: Think about better API design
 	v1 := e.Group("/api/v1")
 
+	auth := v1.Group("/auth")
+	// TODO: Add middleware (only unauthenticated)
+	auth.POST("/signup", authHandler.SignUp)
+	auth.POST("/login", authHandler.Login)
+
 	user := v1.Group("/user")
-	user.POST("", userHandler.Create)
 	user.GET("/:username", userHandler.GetByUsername)
 	user.PUT("/:username", userHandler.Update)
 	user.DELETE("/:username", userHandler.Delete)

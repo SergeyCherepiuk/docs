@@ -19,7 +19,11 @@ func (h AccessHandler) Grant(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file id")
 	}
 
-	file, err := neo4j.FileService.GetById(context.Background(), id.String())
+	ctx := context.Background()
+	sess := neo4j.NewSession(ctx)
+	defer sess.Close(ctx)
+
+	file, err := neo4j.FileService.GetById(ctx, sess, id.String())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, internal.ToSentence(err.Error()))
 	}
@@ -29,7 +33,7 @@ func (h AccessHandler) Grant(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
 	}
 
-	owner, err := neo4j.FileService.GetOwner(context.Background(), file)
+	owner, err := neo4j.FileService.GetOwner(ctx, sess, file)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
@@ -40,18 +44,18 @@ func (h AccessHandler) Grant(c echo.Context) error {
 
 	// TODO: Validation
 
-	receiver, err := neo4j.UserService.GetByUsername(context.Background(), accessBody.Receiver)
+	receiver, err := neo4j.UserService.GetByUsername(ctx, sess, accessBody.Receiver)
 	if err != nil {
 		return err
 	}
 
-	access, err := neo4j.AccessService.Get(context.Background(), file, receiver)
+	access, err := neo4j.AccessService.Get(ctx, sess, file, receiver)
 	if err != nil {
-		if err := neo4j.AccessService.Grant(context.Background(), file, accessBody); err != nil {
+		if err := neo4j.AccessService.Grant(ctx, sess, file, accessBody); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
 	} else {
-		if err := neo4j.AccessService.UpdateLevel(context.Background(), file, access, accessBody.Level); err != nil {
+		if err := neo4j.AccessService.UpdateLevel(ctx, sess, file, access, accessBody.Level); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
 	}
@@ -65,12 +69,16 @@ func (h AccessHandler) GetAccesses(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file id")
 	}
 
-	file, err := neo4j.FileService.GetById(context.Background(), id.String())
+	ctx := context.Background()
+	sess := neo4j.NewSession(ctx)
+	defer sess.Close(ctx)
+
+	file, err := neo4j.FileService.GetById(ctx, sess, id.String())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 
-	accesses, err := neo4j.AccessService.GetAccesses(context.Background(), file)
+	accesses, err := neo4j.AccessService.GetAccesses(ctx, sess, file)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
@@ -84,23 +92,27 @@ func (h AccessHandler) Revoke(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file id")
 	}
 
-	file, err := neo4j.FileService.GetById(context.Background(), id.String())
+	ctx := context.Background()
+	sess := neo4j.NewSession(ctx)
+	defer sess.Close(ctx)
+
+	file, err := neo4j.FileService.GetById(ctx, sess, id.String())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 
 	username := c.Param("username")
-	user, err := neo4j.UserService.GetByUsername(context.Background(), username)
+	user, err := neo4j.UserService.GetByUsername(ctx, sess, username)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 
-	access, err := neo4j.AccessService.Get(context.Background(), file, user)
+	access, err := neo4j.AccessService.Get(ctx, sess, file, user)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 
-	if err := neo4j.AccessService.Revoke(context.Background(), file, access); err != nil {
+	if err := neo4j.AccessService.Revoke(ctx, sess, file, access); err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
 

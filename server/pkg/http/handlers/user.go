@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/SergeyCherepiuk/docs/pkg/database/models"
 	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
 	"github.com/SergeyCherepiuk/docs/pkg/http/handlers/internal"
 	"github.com/labstack/echo/v4"
@@ -13,31 +12,14 @@ import (
 
 type UserHandler struct{}
 
-func (h UserHandler) Create(c echo.Context) error {
-	var user models.User
-	if c.Bind(&user) != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
-	}
-
-	// TODO: Validation
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to hash the password")
-	}
-	user.Password = string(hashedPassword)
-
-	if err := neo4j.UserService.Create(context.Background(), user); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
-	}
-
-	return c.NoContent(http.StatusCreated)
-}
-
 func (h UserHandler) GetByUsername(c echo.Context) error {
 	username := c.Param("username")
 
-	user, err := neo4j.UserService.GetByUsername(context.Background(), username)
+	ctx := context.Background()
+	sess := neo4j.NewSession(ctx)
+	defer sess.Close(ctx)
+
+	user, err := neo4j.UserService.GetByUsername(ctx, sess, username)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
@@ -63,7 +45,11 @@ func (u userUpdates) hasPassword() bool {
 func (h UserHandler) Update(c echo.Context) error {
 	username := c.Param("username")
 
-	user, err := neo4j.UserService.GetByUsername(context.Background(), username)
+	ctx := context.Background()
+	sess := neo4j.NewSession(ctx)
+	defer sess.Close(ctx)
+
+	user, err := neo4j.UserService.GetByUsername(ctx, sess, username)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
 	}
@@ -76,7 +62,7 @@ func (h UserHandler) Update(c echo.Context) error {
 	if updates.hasUsername() {
 		// TODO: Validation
 
-		if err := neo4j.UserService.UpdateUsername(context.Background(), user, updates.NewUsername); err != nil {
+		if err := neo4j.UserService.UpdateUsername(ctx, sess, user, updates.NewUsername); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
 		return c.NoContent(http.StatusOK)
@@ -85,7 +71,7 @@ func (h UserHandler) Update(c echo.Context) error {
 	if updates.hasPassword() {
 		// TODO: Validation
 
-		user, err := neo4j.UserService.GetByUsername(context.Background(), username)
+		user, err := neo4j.UserService.GetByUsername(ctx, sess, username)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
@@ -102,7 +88,7 @@ func (h UserHandler) Update(c echo.Context) error {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to hash the password")
 		}
-		if err := neo4j.UserService.UpdatePassword(context.Background(), user, string(hashedPassword)); err != nil {
+		if err := neo4j.UserService.UpdatePassword(ctx, sess, user, string(hashedPassword)); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
 		return c.NoContent(http.StatusOK)
@@ -114,12 +100,16 @@ func (h UserHandler) Update(c echo.Context) error {
 func (h UserHandler) Delete(c echo.Context) error {
 	username := c.Param("username")
 
-	user, err := neo4j.UserService.GetByUsername(context.Background(), username)
+	ctx := context.Background()
+	sess := neo4j.NewSession(ctx)
+	defer sess.Close(ctx)
+
+	user, err := neo4j.UserService.GetByUsername(ctx, sess, username)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
 	}
 
-	if err := neo4j.UserService.Delete(context.Background(), user); err != nil {
+	if err := neo4j.UserService.Delete(ctx, sess, user); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 

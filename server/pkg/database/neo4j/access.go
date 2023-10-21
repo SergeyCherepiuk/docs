@@ -6,7 +6,6 @@ import (
 
 	"github.com/SergeyCherepiuk/docs/pkg/database/models"
 	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j/internal"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 type accessService struct {
@@ -37,10 +36,7 @@ func NewAccessService() *accessService {
 
 var AccessService = NewAccessService()
 
-func (s accessService) Grant(ctx context.Context, file models.File, access models.Access) error {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-
+func (s accessService) Grant(ctx context.Context, runner runner, file models.File, access models.Access) error {
 	var cypher string
 	switch access.Level {
 	case models.RWAccess:
@@ -57,23 +53,20 @@ func (s accessService) Grant(ctx context.Context, file models.File, access model
 		"granter":  access.Granter,
 	}
 
-	if _, err := session.Run(ctx, cypher, params); err != nil {
+	if _, err := runner.Run(ctx, cypher, params); err != nil {
 		return fmt.Errorf("failed to grand an access")
 	}
 
 	return nil
 }
 
-func (s accessService) Get(ctx context.Context, file models.File, user models.User) (models.Access, error) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-
+func (s accessService) Get(ctx context.Context, runner runner, file models.File, user models.User) (models.Access, error) {
 	params := map[string]any{
 		"username": user.Username,
 		"id":       file.Id,
 	}
 
-	result, err := session.Run(ctx, s.getCypher, params)
+	result, err := runner.Run(ctx, s.getCypher, params)
 	if err != nil {
 		return models.Access{}, fmt.Errorf("failed to get get the file access")
 	}
@@ -81,15 +74,12 @@ func (s accessService) Get(ctx context.Context, file models.File, user models.Us
 	return internal.GetSingle[models.Access](ctx, result, "a")
 }
 
-func (s accessService) GetAccesses(ctx context.Context, file models.File) ([]models.Access, error) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-
+func (s accessService) GetAccesses(ctx context.Context, runner runner, file models.File) ([]models.Access, error) {
 	params := map[string]any{
 		"id": file.Id,
 	}
 
-	result, err := session.Run(ctx, s.getAccessorsCypher, params)
+	result, err := runner.Run(ctx, s.getAccessorsCypher, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get accessors")
 	}
@@ -97,10 +87,7 @@ func (s accessService) GetAccesses(ctx context.Context, file models.File) ([]mod
 	return internal.GetMultiple[models.Access](ctx, result, "a")
 }
 
-func (s accessService) UpdateLevel(ctx context.Context, file models.File, access models.Access, newLevel string) error {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-
+func (s accessService) UpdateLevel(ctx context.Context, runner runner, file models.File, access models.Access, newLevel string) error {
 	params := map[string]any{
 		"receiver":  access.Receiver,
 		"granter":   access.Granter,
@@ -108,7 +95,7 @@ func (s accessService) UpdateLevel(ctx context.Context, file models.File, access
 		"new_level": newLevel,
 	}
 
-	result, err := session.Run(ctx, s.updateLevelCypher, params)
+	result, err := runner.Run(ctx, s.updateLevelCypher, params)
 	if err != nil {
 		return fmt.Errorf("failed to update access level")
 	}
@@ -120,17 +107,14 @@ func (s accessService) UpdateLevel(ctx context.Context, file models.File, access
 	return nil
 }
 
-func (s accessService) Revoke(ctx context.Context, file models.File, access models.Access) error {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-
+func (s accessService) Revoke(ctx context.Context, runner runner, file models.File, access models.Access) error {
 	params := map[string]any{
 		"receiver": access.Receiver,
 		"granter":  access.Granter,
 		"id":       file.Id,
 	}
 
-	if _, err := session.Run(ctx, s.revokeCypher, params); err != nil {
+	if _, err := runner.Run(ctx, s.revokeCypher, params); err != nil {
 		return fmt.Errorf("failed to revoke the access")
 	}
 

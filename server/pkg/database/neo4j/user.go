@@ -35,16 +35,13 @@ func NewUserService() *userService {
 
 var UserService = NewUserService()
 
-func (s userService) Create(ctx context.Context, user models.User) error {
-	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer sessions.Close(ctx)
-
+func (s userService) Create(ctx context.Context, runner runner, user models.User) error {
 	params := map[string]any{
 		"username": user.Username,
 		"password": user.Password,
 	}
 
-	_, err := sessions.Run(ctx, s.createCypher, params)
+	_, err := runner.Run(ctx, s.createCypher, params)
 	if err != nil {
 		if neo4jErr, ok := err.(*neo4j.Neo4jError); ok && neo4jErr.Code == ConstraintValidationFailed {
 			return fmt.Errorf("username already taken")
@@ -55,15 +52,12 @@ func (s userService) Create(ctx context.Context, user models.User) error {
 	return nil
 }
 
-func (s userService) GetByUsername(ctx context.Context, username string) (models.User, error) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-
+func (s userService) GetByUsername(ctx context.Context, runner runner, username string) (models.User, error) {
 	params := map[string]any{
 		"username": username,
 	}
 
-	result, err := session.Run(ctx, s.getByUsernameCypher, params)
+	result, err := runner.Run(ctx, s.getByUsernameCypher, params)
 	if err != nil {
 		return models.User{}, fmt.Errorf("failed to get the user from the database")
 	}
@@ -71,16 +65,13 @@ func (s userService) GetByUsername(ctx context.Context, username string) (models
 	return internal.GetSingle[models.User](ctx, result, "u")
 }
 
-func (s userService) UpdateUsername(ctx context.Context, user models.User, newUsername string) error {
-	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer sessions.Close(ctx)
-
+func (s userService) UpdateUsername(ctx context.Context, runner runner, user models.User, newUsername string) error {
 	params := map[string]any{
 		"username":     user.Username,
 		"new_username": newUsername,
 	}
 
-	result, err := sessions.Run(ctx, s.updateUsernameCypher, params)
+	result, err := runner.Run(ctx, s.updateUsernameCypher, params)
 	if err != nil {
 		if neo4jErr, ok := err.(*neo4j.Neo4jError); ok && neo4jErr.Code == ConstraintValidationFailed {
 			return fmt.Errorf("username already taken")
@@ -96,16 +87,13 @@ func (s userService) UpdateUsername(ctx context.Context, user models.User, newUs
 	return nil
 }
 
-func (s userService) UpdatePassword(ctx context.Context, user models.User, newPassword string) error {
-	sessions := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer sessions.Close(ctx)
-
+func (s userService) UpdatePassword(ctx context.Context, runner runner, user models.User, newPassword string) error {
 	params := map[string]any{
 		"username":     user.Username,
 		"new_password": newPassword,
 	}
 
-	result, err := sessions.Run(ctx, s.updatePasswordCypher, params)
+	result, err := runner.Run(ctx, s.updatePasswordCypher, params)
 	if err != nil {
 		return fmt.Errorf("failed to update user's password")
 	}
@@ -117,15 +105,12 @@ func (s userService) UpdatePassword(ctx context.Context, user models.User, newPa
 	return nil
 }
 
-func (s userService) Delete(ctx context.Context, user models.User) error {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-
+func (s userService) Delete(ctx context.Context, runner runner, user models.User) error {
 	params := map[string]any{
 		"username": user.Username,
 	}
 
-	if _, err := session.Run(ctx, s.deleteCypher, params); err != nil {
+	if _, err := runner.Run(ctx, s.deleteCypher, params); err != nil {
 		return fmt.Errorf("failed to delete the user")
 	}
 	return nil
