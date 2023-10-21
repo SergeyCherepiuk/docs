@@ -3,7 +3,7 @@ package internal_test
 import (
 	"testing"
 
-	"github.com/SergeyCherepiuk/docs/pkg/http/handlers/internal"
+	"github.com/SergeyCherepiuk/docs/pkg/http/internal"
 )
 
 func TestToSentence1(t *testing.T) {

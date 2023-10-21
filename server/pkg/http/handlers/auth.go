@@ -6,7 +6,7 @@ import (
 
 	"github.com/SergeyCherepiuk/docs/pkg/database/models"
 	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
-	"github.com/SergeyCherepiuk/docs/pkg/http/handlers/internal"
+	"github.com/SergeyCherepiuk/docs/pkg/http/internal"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -56,6 +56,12 @@ func (h AuthHandler) SignUp(c echo.Context) error {
 	}
 
 	tx.Commit(ctx)
+	c.SetCookie(&http.Cookie{
+		Name:     "session",
+		Value:    session.Id,
+		Path:     "/",
+		HttpOnly: true,
+	})
 	return c.JSON(http.StatusOK, session)
 }
 
@@ -88,5 +94,11 @@ func (h AuthHandler) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 
+	c.SetCookie(&http.Cookie{
+		Name:     "session",
+		Value:    session.Id,
+		Path:     "/",
+		HttpOnly: true,
+	})
 	return c.JSON(http.StatusOK, session)
 }

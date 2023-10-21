@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
-	"github.com/SergeyCherepiuk/docs/pkg/http/handlers/internal"
+	"github.com/SergeyCherepiuk/docs/pkg/http/internal"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 )

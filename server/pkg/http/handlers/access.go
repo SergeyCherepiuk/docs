@@ -6,7 +6,7 @@ import (
 
 	"github.com/SergeyCherepiuk/docs/pkg/database/models"
 	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
-	"github.com/SergeyCherepiuk/docs/pkg/http/handlers/internal"
+	"github.com/SergeyCherepiuk/docs/pkg/http/internal"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )

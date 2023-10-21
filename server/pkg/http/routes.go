@@ -2,15 +2,16 @@ package http
 
 import (
 	"github.com/SergeyCherepiuk/docs/pkg/http/handlers"
+	"github.com/SergeyCherepiuk/docs/pkg/http/middleware"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
 
 type Router struct{}
 
 func (r Router) Build() *echo.Echo {
 	e := echo.New()
-	e.Use(middleware.Logger())
+	e.Use(echomiddleware.Logger())
 
 	var (
 		authHandler   = handlers.AuthHandler{}
@@ -23,7 +24,7 @@ func (r Router) Build() *echo.Echo {
 	v1 := e.Group("/api/v1")
 
 	auth := v1.Group("/auth")
-	// TODO: Add middleware (only unauthenticated)
+	auth.Use(middleware.NoSession)
 	auth.POST("/signup", authHandler.SignUp)
 	auth.POST("/login", authHandler.Login)
 
