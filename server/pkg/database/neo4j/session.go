@@ -13,6 +13,8 @@ type sessionService struct {
 	createCypher string
 
 	checkCypher string
+
+	deleteAllCypher string
 }
 
 func NewSessionService() *sessionService {
@@ -20,6 +22,8 @@ func NewSessionService() *sessionService {
 		createCypher: `MATCH (u:User {username: $username}) CREATE (u)-[:HAS]->(s:Session {id: $id, created_at: $created_at, expires_at: $expires_at})`,
 
 		checkCypher: `MATCH (u:User)-[:HAS]->(s:Session {id: $id}) WHERE s.expires_at > datetime() RETURN u`,
+
+		deleteAllCypher: `MATCH (u:User {username: $username})-[:HAS]->(s:Session) DETACH DELETE s`,
 	}
 }
 
@@ -51,4 +55,16 @@ func (s sessionService) Check(ctx context.Context, runner runner, id uuid.UUID) 
 	}
 
 	return internal.GetSingle[models.User](ctx, result, "u")
+}
+
+func (s sessionService) DeleteAll(ctx context.Context, runner runner, user models.User) error {
+	params := map[string]any{
+		"username": user.Username,
+	}
+
+	if _, err := runner.Run(ctx, s.deleteAllCypher, params); err != nil {
+		return fmt.Errorf("failed to delete all the sessions")
+	}
+
+	return nil
 }

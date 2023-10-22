@@ -29,6 +29,8 @@ func (r Router) Build() *echo.Echo {
 
 	v1.Use(middleware.RequireSession())
 
+	v1.POST("/auth/logout", authHandler.LogOut)
+
 	user := v1.Group("/user")
 	user.GET("/:username", userHandler.GetByUsername)
 	user.PUT("", userHandler.Update)
@@ -36,14 +38,14 @@ func (r Router) Build() *echo.Echo {
 
 	file := v1.Group("/files")
 	file.POST("", fileHandler.Create)
-	file.GET("/:id", fileHandler.Get, middleware.RequireRAccess)
+	file.GET("/:id", fileHandler.Get, middleware.RequireAtLeastRAccess)
 	file.GET("", fileHandler.GetAll)
-	file.PUT("/:id", fileHandler.Update, middleware.RequireRWAccess)
+	file.PUT("/:id", fileHandler.Update, middleware.RequireAtLeastRWAccess)
 	file.DELETE("/:id", fileHandler.Delete, middleware.RequireOwnerAccess)
 
 	access := file.Group("/access")
 	access.POST("/:id", accessHandler.Grant, middleware.RequireOwnerAccess)
-	access.GET("/:id", accessHandler.GetAccesses, middleware.RequireAnyAccess)
+	access.GET("/:id", accessHandler.GetAccesses, middleware.RequireAtLeastRAccess)
 	access.DELETE("/:id/:username", accessHandler.Revoke, middleware.RequireOwnerAccess)
 
 	return e

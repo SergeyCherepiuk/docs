@@ -14,7 +14,10 @@ import (
 type FileHandler struct{}
 
 func (h FileHandler) Create(c echo.Context) error {
-	user := c.Get("user").(models.User)
+	user, ok := c.Get("user").(models.User)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "User wasn't found")
+	}
 
 	ctx := context.Background()
 	sess := neo4j.NewSession(ctx)
@@ -50,7 +53,7 @@ func (h FileHandler) Get(c echo.Context) error {
 	sess := neo4j.NewSession(ctx)
 	defer sess.Close(ctx)
 
-	file, err := neo4j.FileService.GetById(ctx, sess, id.String())
+	file, err := neo4j.FileService.GetById(ctx, sess, id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
@@ -68,7 +71,10 @@ func (h FileHandler) Get(c echo.Context) error {
 }
 
 func (h FileHandler) GetAll(c echo.Context) error {
-	user := c.Get("user").(models.User)
+	user, ok := c.Get("user").(models.User)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "User wasn't found")
+	}
 
 	ctx := context.Background()
 	sess := neo4j.NewSession(ctx)
@@ -104,7 +110,7 @@ func (h FileHandler) Update(c echo.Context) error {
 	sess := neo4j.NewSession(ctx)
 	defer sess.Close(ctx)
 
-	file, err := neo4j.FileService.GetById(ctx, sess, id.String())
+	file, err := neo4j.FileService.GetById(ctx, sess, id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}
@@ -136,7 +142,7 @@ func (h FileHandler) Delete(c echo.Context) error {
 	sess := neo4j.NewSession(ctx)
 	defer sess.Close(ctx)
 
-	file, err := neo4j.FileService.GetById(ctx, sess, id.String())
+	file, err := neo4j.FileService.GetById(ctx, sess, id)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, internal.ToSentence(err.Error()))
 	}

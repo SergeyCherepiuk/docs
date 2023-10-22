@@ -6,6 +6,7 @@ import (
 
 	"github.com/SergeyCherepiuk/docs/pkg/database/models"
 	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j/internal"
+	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
@@ -58,9 +59,9 @@ func (s fileService) Create(ctx context.Context, runner runner, file models.File
 	return nil
 }
 
-func (s fileService) GetById(ctx context.Context, runner runner, id string) (models.File, error) {
+func (s fileService) GetById(ctx context.Context, runner runner, id uuid.UUID) (models.File, error) {
 	params := map[string]any{
-		"id": id,
+		"id": id.String(),
 	}
 
 	result, err := runner.Run(ctx, s.getByIdCypher, params)

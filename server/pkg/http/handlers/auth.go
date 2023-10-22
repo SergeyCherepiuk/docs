@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/SergeyCherepiuk/docs/pkg/database/models"
 	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
@@ -101,4 +102,28 @@ func (h AuthHandler) Login(c echo.Context) error {
 		HttpOnly: true,
 	})
 	return c.JSON(http.StatusOK, session)
+}
+
+func (h AuthHandler) LogOut(c echo.Context) error {
+	user, ok := c.Get("user").(models.User)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "User wasn't found")
+	}
+
+	ctx := context.Background()
+	sess := neo4j.NewSession(ctx)
+	defer sess.Close(ctx)
+
+	if err := neo4j.SessionService.DeleteAll(ctx, sess, user); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
+	}
+
+	c.SetCookie(&http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Expires:  time.Now(),
+	})
+	return c.NoContent(http.StatusOK)
 }

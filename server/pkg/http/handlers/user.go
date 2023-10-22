@@ -44,7 +44,10 @@ func (u userUpdates) hasPassword() bool {
 }
 
 func (h UserHandler) Update(c echo.Context) error {
-	user := c.Get("user").(models.User)
+	user, ok := c.Get("user").(models.User)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "User wasn't found")
+	}
 
 	ctx := context.Background()
 	sess := neo4j.NewSession(ctx)
@@ -94,7 +97,10 @@ func (h UserHandler) Update(c echo.Context) error {
 }
 
 func (h UserHandler) Delete(c echo.Context) error {
-	user := c.Get("user").(models.User)
+	user, ok := c.Get("user").(models.User)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "User wasn't found")
+	}
 
 	ctx := context.Background()
 	sess := neo4j.NewSession(ctx)
