@@ -14,6 +14,8 @@ import (
 type AccessHandler struct{}
 
 func (h AccessHandler) Grant(c echo.Context) error {
+	user := c.Get("user").(models.User)
+
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid file id")
@@ -28,36 +30,38 @@ func (h AccessHandler) Grant(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, internal.ToSentence(err.Error()))
 	}
 
-	var accessBody models.Access
-	if err := c.Bind(&accessBody); err != nil {
+	type RequestBody struct {
+		Receiver string `json:"receiver"`
+		Level    string `json:"level"`
+	}
+
+	var body RequestBody
+	if err := c.Bind(&body); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
-	}
-
-	owner, err := neo4j.FileService.GetOwner(ctx, sess, file)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
-	}
-
-	if owner.Username != accessBody.Granter {
-		return echo.NewHTTPError(http.StatusInternalServerError, "User has no permissions to grant an access to the file")
 	}
 
 	// TODO: Validation
 
-	receiver, err := neo4j.UserService.GetByUsername(ctx, sess, accessBody.Receiver)
+	receiver, err := neo4j.UserService.GetByUsername(ctx, sess, body.Receiver)
 	if err != nil {
 		return err
 	}
 
-	access, err := neo4j.AccessService.Get(ctx, sess, file, receiver)
-	if err != nil {
-		if err := neo4j.AccessService.Grant(ctx, sess, file, accessBody); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
-		}
+	access := models.Access{
+		Granter:  user.Username,
+		Receiver: receiver.Username,
+		Level:    body.Level,
+	}
+
+	prevAccess, prevAccessErr := neo4j.AccessService.Get(ctx, sess, file, receiver)
+	if prevAccessErr != nil {
+		err = neo4j.AccessService.Grant(ctx, sess, file, access)
 	} else {
-		if err := neo4j.AccessService.UpdateLevel(ctx, sess, file, access, accessBody.Level); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
-		}
+		err = neo4j.AccessService.UpdateLevel(ctx, sess, file, prevAccess, access.Level)
+	}
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 	}
 
 	return c.NoContent(http.StatusCreated)

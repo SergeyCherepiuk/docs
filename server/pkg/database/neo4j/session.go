@@ -19,7 +19,7 @@ func NewSessionService() *sessionService {
 	return &sessionService{
 		createCypher: `MATCH (u:User {username: $username}) CREATE (u)-[:HAS]->(s:Session {id: $id, created_at: $created_at, expires_at: $expires_at})`,
 
-		checkCypher: `MATCH (s:Session {id: $id}) RETURN s.expires_at > datetime() as a`,
+		checkCypher: `MATCH (u:User)-[:HAS]->(s:Session {id: $id}) WHERE s.expires_at > datetime() RETURN u`,
 	}
 }
 
@@ -40,16 +40,15 @@ func (s sessionService) Create(ctx context.Context, runner runner, session model
 	return nil
 }
 
-// TODO: Return session's owner (models.User)
-func (s sessionService) Check(ctx context.Context, runner runner, id uuid.UUID) (bool, error) {
+func (s sessionService) Check(ctx context.Context, runner runner, id uuid.UUID) (models.User, error) {
 	params := map[string]any{
 		"id": id.String(),
 	}
 
 	result, err := runner.Run(ctx, s.checkCypher, params)
 	if err != nil {
-		return false, fmt.Errorf("failed to check the session")
+		return models.User{}, fmt.Errorf("failed to check the session")
 	}
 
-	return internal.GetSingle[bool](ctx, result, "a")
+	return internal.GetSingle[models.User](ctx, result, "u")
 }

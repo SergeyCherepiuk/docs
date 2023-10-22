@@ -9,28 +9,60 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func NoSession(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		cookie, err := c.Cookie("session")
-		if err != nil {
-			return next(c)
+const (
+	REQUIRE_SESSION    = 1
+	REQUIRE_NO_SESSION = 2
+)
+
+func RequireSession() echo.MiddlewareFunc {
+	return checkSession(REQUIRE_SESSION)
+}
+
+func RequireNoSession() echo.MiddlewareFunc {
+	return checkSession(REQUIRE_NO_SESSION)
+}
+
+func checkSession(flag int) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		unauthorized := func(c echo.Context) error {
+			return c.NoContent(http.StatusUnauthorized)
 		}
 
-		id, err := uuid.Parse(cookie.Value)
-		if err != nil {
-			return next(c)
+		var (
+			onSessionPresent func(c echo.Context) error
+			onSessionAbsent  func(c echo.Context) error
+		)
+
+		if flag == REQUIRE_SESSION {
+			onSessionPresent = next
+			onSessionAbsent = unauthorized
+		} else if flag == REQUIRE_NO_SESSION {
+			onSessionPresent = unauthorized
+			onSessionAbsent = next
 		}
 
-		ctx := context.Background()
-		sess := neo4j.NewSession(ctx)
-		defer sess.Close(ctx)
+		return func(c echo.Context) error {
+			cookie, err := c.Cookie("session")
+			if err != nil {
+				return onSessionAbsent(c)
+			}
 
-		active, err := neo4j.SessionService.Check(ctx, sess, id)
-		if !active || err != nil {
-			return next(c)
+			id, err := uuid.Parse(cookie.Value)
+			if err != nil {
+				return onSessionAbsent(c)
+			}
+
+			ctx := context.Background()
+			sess := neo4j.NewSession(ctx)
+			defer sess.Close(ctx)
+
+			user, err := neo4j.SessionService.Check(ctx, sess, id)
+			if err != nil {
+				return onSessionAbsent(c)
+			}
+
+			c.Set("user", user)
+			return onSessionPresent(c)
 		}
-
-		// TODO: Set session owner's username to locals
-		return echo.NewHTTPError(http.StatusBadRequest, "There is an active session")
 	}
 }

@@ -20,31 +20,31 @@ func (r Router) Build() *echo.Echo {
 		accessHandler = handlers.AccessHandler{}
 	)
 
-	// TODO: Think about better API design
 	v1 := e.Group("/api/v1")
 
 	auth := v1.Group("/auth")
-	auth.Use(middleware.NoSession)
+	auth.Use(middleware.RequireNoSession())
 	auth.POST("/signup", authHandler.SignUp)
 	auth.POST("/login", authHandler.Login)
 
+	v1.Use(middleware.RequireSession())
+
 	user := v1.Group("/user")
 	user.GET("/:username", userHandler.GetByUsername)
-	user.PUT("/:username", userHandler.Update)
-	user.DELETE("/:username", userHandler.Delete)
+	user.PUT("", userHandler.Update)
+	user.DELETE("", userHandler.Delete)
 
-	file := v1.Group("/file")
+	file := v1.Group("/files")
 	file.POST("", fileHandler.Create)
-	file.GET("/:id", fileHandler.Get)
-	file.GET("/owner/:username", fileHandler.GetAll)
-	file.PUT("/:id", fileHandler.Update)
-	file.DELETE("/:id", fileHandler.Delete)
-	file.DELETE("/owner/:username", fileHandler.DeleteAllForOwner)
+	file.GET("/:id", fileHandler.Get, middleware.RequireRAccess)
+	file.GET("", fileHandler.GetAll)
+	file.PUT("/:id", fileHandler.Update, middleware.RequireRWAccess)
+	file.DELETE("/:id", fileHandler.Delete, middleware.RequireOwnerAccess)
 
 	access := file.Group("/access")
-	access.POST("/:id", accessHandler.Grant)
-	access.GET("/:id", accessHandler.GetAccesses)
-	access.DELETE("/:id/:username", accessHandler.Revoke)
+	access.POST("/:id", accessHandler.Grant, middleware.RequireOwnerAccess)
+	access.GET("/:id", accessHandler.GetAccesses, middleware.RequireAnyAccess)
+	access.DELETE("/:id/:username", accessHandler.Revoke, middleware.RequireOwnerAccess)
 
 	return e
 }

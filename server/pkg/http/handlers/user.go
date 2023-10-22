@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/SergeyCherepiuk/docs/pkg/database/models"
 	"github.com/SergeyCherepiuk/docs/pkg/database/neo4j"
 	"github.com/SergeyCherepiuk/docs/pkg/http/internal"
 	"github.com/labstack/echo/v4"
@@ -43,16 +44,11 @@ func (u userUpdates) hasPassword() bool {
 }
 
 func (h UserHandler) Update(c echo.Context) error {
-	username := c.Param("username")
+	user := c.Get("user").(models.User)
 
 	ctx := context.Background()
 	sess := neo4j.NewSession(ctx)
 	defer sess.Close(ctx)
-
-	user, err := neo4j.UserService.GetByUsername(ctx, sess, username)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
-	}
 
 	var updates userUpdates
 	if c.Bind(&updates) != nil {
@@ -71,7 +67,7 @@ func (h UserHandler) Update(c echo.Context) error {
 	if updates.hasPassword() {
 		// TODO: Validation
 
-		user, err := neo4j.UserService.GetByUsername(ctx, sess, username)
+		user, err := neo4j.UserService.GetByUsername(ctx, sess, user.Username)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
 		}
@@ -98,16 +94,11 @@ func (h UserHandler) Update(c echo.Context) error {
 }
 
 func (h UserHandler) Delete(c echo.Context) error {
-	username := c.Param("username")
+	user := c.Get("user").(models.User)
 
 	ctx := context.Background()
 	sess := neo4j.NewSession(ctx)
 	defer sess.Close(ctx)
-
-	user, err := neo4j.UserService.GetByUsername(ctx, sess, username)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "User wasn't found")
-	}
 
 	if err := neo4j.UserService.Delete(ctx, sess, user); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, internal.ToSentence(err.Error()))
