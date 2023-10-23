@@ -1,0 +1,1 @@
+<h1 class="flex h-full w-full items-center justify-center">Home page</h1>

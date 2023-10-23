@@ -1,0 +1,1 @@
+<h1 class="flex h-full w-full items-center justify-center">Sign up page</h1>
