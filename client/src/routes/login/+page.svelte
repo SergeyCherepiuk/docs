@@ -5,17 +5,59 @@
 	import { ValidationRuleMinimumLength } from "../../validation/MinimumLength";
 	import { ValidationRuleUpperCaseLetters } from "../../validation/UpperCaseLetters";
     
+    let errorMessage: string | null = null
     let username: string = ""
     let password: string = ""
 
     let usernameValidationRules = [new ValidationRuleRequired(), new ValidationRuleMinimumLength(3)]
     let passwordValidationRules = [new ValidationRuleRequired(), new ValidationRuleMinimumLength(8), new ValidationRuleUpperCaseLetters(3)]
+
+    let loginPromise: Promise<Response> | undefined = undefined
+    function login() {
+        // TODO: Validate all TextFields
+
+        loginPromise = fetch("http://localhost:3000/api/v1/auth/login", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                "username": username,
+                "password": password,
+            }),
+        })
+
+        loginPromise.then(response => {
+            if (response.ok) {
+                // TODO: Redirect to the home page
+                return 
+            }
+            response.json().then(body => errorMessage = body.message)
+        })
+    }
+
+    function wait(ms: number): Promise<any> {
+        return new Promise((res) => setTimeout(res , ms))
+    }
 </script>
 
-<div class="flex w-full h-full items-center justify-center content-center">
+<div class="flex flex-col gap-4 w-full h-full items-center justify-center content-center">
     <div id="inputs" class="flex flex-col items-center gap-8 w-[90%] min-[440px]:w-[80%] min-[550px]:w-[70%] min-[660px]:w-[60%] min-[770px]:w-[50%] min-[990px]:w-[40%] min-[1210px]:w-[30%] min-[1430px]:w-[20%]">
+        {#if errorMessage}
+            <div class="text-red-500">{errorMessage}</div>
+        {/if}
         <TextField bind:value={username} placeholder="Username" validationRules={usernameValidationRules} />
         <TextField bind:value={password} type="password" placeholder="Password" validationRules={passwordValidationRules} />
-        <Button type="submit" onClick={() => { /* TODO: Login */ }}>Login</Button>
+        <Button type="submit" onClick={login}>
+            <div class="flex flex-row gap-2 items-center">
+                Login
+                {#await loginPromise}
+                    {#await wait(500)}<!--Do nothing-->{:then}
+                        <img src="/images/spinner.svg" alt="Loading spinner" />    
+                    {/await}
+                {/await}
+            </div>
+        </Button>
     </div>
 </div>

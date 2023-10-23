@@ -5,6 +5,6 @@
     export let onClick: MouseEventHandler<HTMLButtonElement>
 </script>
 
-<button {type} on:click={onClick} class="py-4 px-8 w-min bg-black text-white">
+<button {type} on:click={onClick} class="py-4 px-8 w-fit bg-black text-white">
     <slot />
 </button>

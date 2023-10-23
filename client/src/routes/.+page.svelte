@@ -98,7 +98,7 @@
 
 <!-- <div class="flex w-full min-w-fit h-full justify-center bg-gray-300"> -->
     {#each $users.keys() as id}
-        <img id={`pointer-${id}`} src="/pointer.svg" alt="Pointer" class="absolute pointer-events-none" />
+        <img id={`pointer-${id}`} src="/images/pointer.svg" alt="Pointer" class="absolute pointer-events-none" />
     {/each}
     <textarea id="area" class="w-[768px] h-[2000px] resize-none p-8" value={$content.data} />
 <!-- </div> -->

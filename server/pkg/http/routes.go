@@ -11,6 +11,10 @@ type Router struct{}
 
 func (r Router) Build() *echo.Echo {
 	e := echo.New()
+	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
+		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowCredentials: true,
+	}))
 	e.Use(echomiddleware.Logger())
 
 	var (
