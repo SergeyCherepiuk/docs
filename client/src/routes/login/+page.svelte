@@ -4,6 +4,7 @@
     import { ValidationRuleRequired } from "../../validation/Required";
 	import { ValidationRuleMinimumLength } from "../../validation/MinimumLength";
 	import { ValidationRuleUpperCaseLetters } from "../../validation/UpperCaseLetters";
+	import { goto } from "$app/navigation";
     
     let errorMessage: string | null = null
     let username: string = ""
@@ -30,10 +31,10 @@
 
         loginPromise.then(response => {
             if (response.ok) {
-                // TODO: Redirect to the home page
-                return 
+                goto("/home")
+            } else {
+                response.json().then(body => errorMessage = body.message)
             }
-            response.json().then(body => errorMessage = body.message)
         })
     }
 
