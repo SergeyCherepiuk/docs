@@ -54,7 +54,17 @@ func (s sessionService) Check(ctx context.Context, runner runner, id uuid.UUID) 
 		return models.User{}, fmt.Errorf("failed to check the session")
 	}
 
-	return internal.GetSingle[models.User](ctx, result, "u")
+	user, err := internal.GetSingle[models.User](ctx, result, "u")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return models.User{}, fmt.Errorf("user wasn't found")
+		default:
+			return models.User{}, fmt.Errorf("failed to check the session")
+		}
+	}
+
+	return user, nil
 }
 
 func (s sessionService) DeleteAll(ctx context.Context, runner runner, user models.User) error {
@@ -63,7 +73,7 @@ func (s sessionService) DeleteAll(ctx context.Context, runner runner, user model
 	}
 
 	if _, err := runner.Run(ctx, s.deleteAllCypher, params); err != nil {
-		return fmt.Errorf("failed to delete all the sessions")
+		return fmt.Errorf("failed to delete all sessions")
 	}
 
 	return nil

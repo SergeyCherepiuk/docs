@@ -62,7 +62,17 @@ func (s userService) GetByUsername(ctx context.Context, runner runner, username 
 		return models.User{}, fmt.Errorf("failed to get the user from the database")
 	}
 
-	return internal.GetSingle[models.User](ctx, result, "u")
+	user, err := internal.GetSingle[models.User](ctx, result, "u")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return models.User{}, fmt.Errorf("user wasn't found")
+		default:
+			return models.User{}, fmt.Errorf("failed to get the user from the database")
+		}
+	}
+
+	return user, nil
 }
 
 func (s userService) UpdateUsername(ctx context.Context, runner runner, user models.User, newUsername string) error {
@@ -80,8 +90,18 @@ func (s userService) UpdateUsername(ctx context.Context, runner runner, user mod
 		}
 	}
 
-	if count, err := internal.GetSingle[int64](ctx, result, "c"); count <= 0 || err != nil {
-		return fmt.Errorf("user wasn't found")
+	count, err := internal.GetSingle[int64](ctx, result, "c")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return fmt.Errorf("user wasn't found")
+		default:
+			return fmt.Errorf("failed to update user's username")
+		}
+	}
+
+	if count <= 0 {
+		return fmt.Errorf("failed to update user's username")
 	}
 
 	return nil
@@ -98,8 +118,18 @@ func (s userService) UpdatePassword(ctx context.Context, runner runner, user mod
 		return fmt.Errorf("failed to update user's password")
 	}
 
-	if count, err := internal.GetSingle[int64](ctx, result, "c"); count <= 0 || err != nil {
-		return fmt.Errorf("user wasn't found")
+	count, err := internal.GetSingle[int64](ctx, result, "c")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return fmt.Errorf("user wasn't found")
+		default:
+			return fmt.Errorf("failed to update user's password")
+		}
+	}
+
+	if count <= 0 {
+		return fmt.Errorf("failed to update user's password")
 	}
 
 	return nil

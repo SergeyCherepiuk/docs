@@ -71,7 +71,17 @@ func (s accessService) Get(ctx context.Context, runner runner, file models.File,
 		return models.Access{}, fmt.Errorf("failed to get get the file access")
 	}
 
-	return internal.GetSingle[models.Access](ctx, result, "a")
+	access, err := internal.GetSingle[models.Access](ctx, result, "a")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return models.Access{}, fmt.Errorf("access wasn't found")
+		default:
+			return models.Access{}, fmt.Errorf("failed to get get the file access")
+		}
+	}
+
+	return access, nil
 }
 
 func (s accessService) GetAccesses(ctx context.Context, runner runner, file models.File) ([]models.Access, error) {
@@ -84,7 +94,17 @@ func (s accessService) GetAccesses(ctx context.Context, runner runner, file mode
 		return nil, fmt.Errorf("failed to get accessors")
 	}
 
-	return internal.GetMultiple[models.Access](ctx, result, "a")
+	accesses, err := internal.GetMultiple[models.Access](ctx, result, "a")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return []models.Access{}, nil
+		default:
+			return nil, fmt.Errorf("failed to get accessors")
+		}
+	}
+
+	return accesses, nil
 }
 
 func (s accessService) UpdateLevel(ctx context.Context, runner runner, file models.File, access models.Access, newLevel string) error {

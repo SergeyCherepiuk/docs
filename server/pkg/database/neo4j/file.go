@@ -69,7 +69,17 @@ func (s fileService) GetById(ctx context.Context, runner runner, id uuid.UUID) (
 		return models.File{}, fmt.Errorf("file to get the file from the database")
 	}
 
-	return internal.GetSingle[models.File](ctx, result, "f")
+	file, err := internal.GetSingle[models.File](ctx, result, "f")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return models.File{}, fmt.Errorf("file wasn't found")
+		default:
+			return models.File{}, fmt.Errorf("file to get the file from the database")
+		}
+	}
+
+	return file, nil
 }
 
 func (s fileService) GetOwner(ctx context.Context, runner runner, file models.File) (models.User, error) {
@@ -82,7 +92,17 @@ func (s fileService) GetOwner(ctx context.Context, runner runner, file models.Fi
 		return models.User{}, fmt.Errorf("failed to get the file's owner from the database")
 	}
 
-	return internal.GetSingle[models.User](ctx, result, "u")
+	owner, err := internal.GetSingle[models.User](ctx, result, "u")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return models.User{}, fmt.Errorf("owner wasn't found")
+		default:
+			return models.User{}, fmt.Errorf("failed to get the file's owner from the database")
+		}
+	}
+
+	return owner, nil
 }
 
 func (s fileService) GetAllForOwner(ctx context.Context, runner runner, owner models.User) ([]models.File, error) {
@@ -95,7 +115,17 @@ func (s fileService) GetAllForOwner(ctx context.Context, runner runner, owner mo
 		return nil, fmt.Errorf("failed to get all files for owner from the database")
 	}
 
-	return internal.GetMultiple[models.File](ctx, result, "f")
+	files, err := internal.GetMultiple[models.File](ctx, result, "f")
+	if err != nil {
+		switch err.(type) {
+		case internal.ErrorNoRecords, internal.ErrorNilRecord:
+			return []models.File{}, nil
+		default:
+			return nil, fmt.Errorf("failed to get all files for owner from the database")
+		}
+	}
+
+	return files, nil
 }
 
 func (s fileService) UpdateName(ctx context.Context, runner runner, file models.File, name string) error {
